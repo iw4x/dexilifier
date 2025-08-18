@@ -545,7 +545,6 @@
             {
                 dialog.ShowNewFolderButton = false;
                 dialog.RootFolder = Environment.SpecialFolder.MyComputer;
-                dialog.SelectedPath = "L:\\IW4X_FG\\userrawE\\dump\\mp_nightshift";
                 DialogResult result = dialog.ShowDialog();
                 if (result == DialogResult.OK)
                 {
