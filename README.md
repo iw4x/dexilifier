@@ -9,4 +9,5 @@ This is a tool for tinkering.
 TODO:
 - More operation reduction and detection (uniform multiplication e.g.)
 - Variant detection & master shader generation from several LIT variantes of a same technique
-  
+- Pixel Shaders with anything else than 4-dimensional output (1D noise sampling for instance)
+- lp sm sun fog b0c0n0s0 nc sm3 (has a 3D sampler, not supported)
