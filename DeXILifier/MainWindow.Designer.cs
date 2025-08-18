@@ -69,9 +69,9 @@
             this.imageList1 = new System.Windows.Forms.ImageList(this.components);
             this.compiledShaderTab = new System.Windows.Forms.TabPage();
             this.splitContainer1 = new System.Windows.Forms.SplitContainer();
-            this.splitContainer2 = new System.Windows.Forms.SplitContainer();
             this.toolOutputTabs = new System.Windows.Forms.TabControl();
             this.shaderTab = new System.Windows.Forms.TabPage();
+            this.splitContainer2 = new System.Windows.Forms.SplitContainer();
             this.techniqueSetTab = new System.Windows.Forms.TabPage();
             this.techSetView = new DX9ShaderHLSLifier.TechniqueSetView();
             groupBox3 = new System.Windows.Forms.GroupBox();
@@ -90,12 +90,12 @@
             this.splitContainer1.Panel1.SuspendLayout();
             this.splitContainer1.Panel2.SuspendLayout();
             this.splitContainer1.SuspendLayout();
+            this.toolOutputTabs.SuspendLayout();
+            this.shaderTab.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.splitContainer2)).BeginInit();
             this.splitContainer2.Panel1.SuspendLayout();
             this.splitContainer2.Panel2.SuspendLayout();
             this.splitContainer2.SuspendLayout();
-            this.toolOutputTabs.SuspendLayout();
-            this.shaderTab.SuspendLayout();
             this.techniqueSetTab.SuspendLayout();
             this.SuspendLayout();
             // 
@@ -524,24 +524,6 @@
             this.splitContainer1.SplitterDistance = 535;
             this.splitContainer1.TabIndex = 7;
             // 
-            // splitContainer2
-            // 
-            this.splitContainer2.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.splitContainer2.FixedPanel = System.Windows.Forms.FixedPanel.Panel2;
-            this.splitContainer2.Location = new System.Drawing.Point(3, 3);
-            this.splitContainer2.Name = "splitContainer2";
-            // 
-            // splitContainer2.Panel1
-            // 
-            this.splitContainer2.Panel1.Controls.Add(rebuiltHlslGroup);
-            // 
-            // splitContainer2.Panel2
-            // 
-            this.splitContainer2.Panel2.Controls.Add(groupBox3);
-            this.splitContainer2.Size = new System.Drawing.Size(1034, 757);
-            this.splitContainer2.SplitterDistance = 704;
-            this.splitContainer2.TabIndex = 0;
-            // 
             // toolOutputTabs
             // 
             this.toolOutputTabs.Alignment = System.Windows.Forms.TabAlignment.Left;
@@ -567,6 +549,24 @@
             this.shaderTab.Text = "Shader HLSL";
             this.shaderTab.UseVisualStyleBackColor = true;
             // 
+            // splitContainer2
+            // 
+            this.splitContainer2.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.splitContainer2.FixedPanel = System.Windows.Forms.FixedPanel.Panel2;
+            this.splitContainer2.Location = new System.Drawing.Point(3, 3);
+            this.splitContainer2.Name = "splitContainer2";
+            // 
+            // splitContainer2.Panel1
+            // 
+            this.splitContainer2.Panel1.Controls.Add(rebuiltHlslGroup);
+            // 
+            // splitContainer2.Panel2
+            // 
+            this.splitContainer2.Panel2.Controls.Add(groupBox3);
+            this.splitContainer2.Size = new System.Drawing.Size(1034, 757);
+            this.splitContainer2.SplitterDistance = 704;
+            this.splitContainer2.TabIndex = 0;
+            // 
             // techniqueSetTab
             // 
             this.techniqueSetTab.Controls.Add(this.techSetView);
@@ -591,6 +591,7 @@
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(1606, 771);
             this.Controls.Add(this.splitContainer1);
+            this.Icon = ((System.Drawing.Icon)(resources.GetObject("$this.Icon")));
             this.Name = "MainWindow";
             this.Text = "DeXilifier";
             this.WindowState = System.Windows.Forms.FormWindowState.Maximized;
@@ -611,12 +612,12 @@
             this.splitContainer1.Panel2.ResumeLayout(false);
             ((System.ComponentModel.ISupportInitialize)(this.splitContainer1)).EndInit();
             this.splitContainer1.ResumeLayout(false);
+            this.toolOutputTabs.ResumeLayout(false);
+            this.shaderTab.ResumeLayout(false);
             this.splitContainer2.Panel1.ResumeLayout(false);
             this.splitContainer2.Panel2.ResumeLayout(false);
             ((System.ComponentModel.ISupportInitialize)(this.splitContainer2)).EndInit();
             this.splitContainer2.ResumeLayout(false);
-            this.toolOutputTabs.ResumeLayout(false);
-            this.shaderTab.ResumeLayout(false);
             this.techniqueSetTab.ResumeLayout(false);
             this.ResumeLayout(false);
 
