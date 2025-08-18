@@ -233,6 +233,12 @@
             return modified;
         }
 
+        public virtual bool FormatLine(CodeData destination, IReadOnlyList<CodeData> arguments, out string result)
+        {
+            result = default;
+            return false;
+        }
+
         public string FormatCall(CodeData destination, IReadOnlyList<CodeData> arguments)
         {
             string str = FormatCallInternal(destination, arguments);

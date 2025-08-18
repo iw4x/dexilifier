@@ -3,6 +3,7 @@
     using Microsoft.Win32;
     using System;
     using System.Collections.Generic;
+    using System.Diagnostics;
     using System.Linq;
     using System.Reflection;
     using System.Resources;
@@ -584,12 +585,18 @@
                     Destination.Declare(builder);
                 }
 
-                builder.Append(Destination.GetDecompiledName());
+                if (Instruction.FormatLine(Destination, Arguments, out string result))
+                {
+                    builder.Append(result);
+                }
+                else
+                {
+                    builder.Append(Destination.GetDecompiledName());
 
-                builder.Append(" = ");
+                    builder.Append(" = ");
 
-                builder.Append(Instruction.FormatCall(Destination, Arguments));
-
+                    builder.Append(Instruction.FormatCall(Destination, Arguments));
+                }
 
                 builder.Append(";");
             }
@@ -1628,7 +1635,21 @@
                 // Sampler input - already declared in the header
                 if (state.resources.TryGetValue(registerName, out ShaderResource resource) && resource is Sampler sampler)
                 {
-                    sampler.samplerType = resourceName == "cube" ? Sampler.SamplerType.samplerCUBE : Sampler.SamplerType.sampler2D;
+                    switch (resourceName)
+                    {
+                        default:
+                            sampler.samplerType = Sampler.SamplerType.sampler2D;
+                            break;
+
+                        case "cube":
+                            sampler.samplerType = Sampler.SamplerType.samplerCUBE;
+                            break;
+
+                        case "volume":
+                            sampler.samplerType = Sampler.SamplerType.sampler3D;
+                            break;
+                        
+                    }
                 }
 
                 // No need to add it

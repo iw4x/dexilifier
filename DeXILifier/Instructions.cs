@@ -2,6 +2,7 @@
 {
     using System;
     using System.Collections.Generic;
+    using System.Reflection;
     using static DX9ShaderHLSLifier.ShaderProgramObject;
 
     public static class Instructions
@@ -198,12 +199,35 @@
                 return modified;
             }
 
+            public override bool FormatLine(CodeData destination, IReadOnlyList<CodeData> arguments, out string result)
+            {
+                System.Diagnostics.Debug.Assert(arguments.Count == 2);
+                if ((arguments[0].ResourceHashCode == destination.ResourceHashCode) ^
+                    (arguments[1].ResourceHashCode == destination.ResourceHashCode))
+                {
+                    CodeData otherArg = arguments[0].ResourceHashCode == destination.ResourceHashCode ?
+                        arguments[1] : arguments[0];
+
+                    result = $"{destination.GetDecompiledName()} *= {FormatCall(destination, new CodeData[] { otherArg })}";
+                    return true;
+                }
+
+
+                return base.FormatLine(destination, arguments, out result);
+            }
+
             protected override string FormatCallInternal(params string[] arguments)
             {
-                // TODO : Detect uniform multiplication
-                System.Diagnostics.Debug.Assert(arguments.Length == 2);
+                System.Diagnostics.Debug.Assert(arguments.Length == 1 || arguments.Length == 2);
 
-                return string.Format("{0} * {1}", arguments);
+                if (arguments.Length == 1)
+                {
+                    return arguments[0];
+                }
+                else
+                {
+                    return string.Format("{0} * {1}", arguments);
+                }
             }
         }
 
@@ -477,11 +501,36 @@
             {
             }
 
+            public override bool FormatLine(CodeData destination, IReadOnlyList<CodeData> arguments, out string result)
+            {
+                System.Diagnostics.Debug.Assert(arguments.Count == 2);
+                if ((arguments[0].ResourceHashCode == destination.ResourceHashCode) ^
+                    (arguments[1].ResourceHashCode == destination.ResourceHashCode))
+                {
+                    CodeData otherArg = arguments[0].ResourceHashCode == destination.ResourceHashCode ?
+                        arguments[1] : arguments[0];
+
+                    result = $"{destination.GetDecompiledName()} += {FormatCall(destination, new CodeData[] { otherArg })}";
+                    return true;
+                }
+
+
+                return base.FormatLine(destination, arguments, out result);
+            }
+
+
             protected override string FormatCallInternal(params string[] arguments)
             {
-                System.Diagnostics.Debug.Assert(arguments.Length == 2);
+                System.Diagnostics.Debug.Assert(arguments.Length == 1 || arguments.Length == 2);
 
-                return string.Format("{0} + {1}", arguments);
+                if (arguments.Length == 1)
+                {
+                    return arguments[0];
+                }
+                else
+                {
+                    return string.Format("{0} + {1}", arguments);
+                }
             }
         }
 

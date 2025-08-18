@@ -885,6 +885,11 @@
                 }
             }
 
+            if ( statement.lines[0] == 67)
+            {
+                Debug.Write("");
+            }
+
             // Find relatives
             HashSet<Statement> family = new HashSet<Statement>();
             if (requiredVariableChannels.Count > 0)
@@ -896,6 +901,7 @@
                 {
                     if (statements[i].Destination is VariableData otherStatementVariableData)
                     {
+
                         for (int rqVariableIndex = 0; rqVariableIndex < requiredVariableChannels.Count; rqVariableIndex++)
                         {
                             VariableChannel varChan = requiredVariableChannels[rqVariableIndex];
@@ -943,7 +949,12 @@
             // Sort family by some criterias so it looks nicer
             Statement[] familyArray =
                 family
-                    .OrderBy(o=>o.Destination is ResourceData rsc && rsc.resource is Output)
+                    .OrderBy(o=>o.lines.Min())
+                    // These will almost never come into effect
+                    // The issue is you gotta keep the line order for dependencies as an insurance against dependency erasure via rewrites
+                    // Reordering is done later anyway so this might not be a big deal
+                    // But if you mess up the ordering here, the whole program is dead (nested dependencies are not managed. they should be)
+                    .ThenBy(o => o.Destination is ResourceData rsc && rsc.resource is Output)
                     .ThenBy(o => o.Destination.UsedChannels.Length)
                     .ThenBy(o => o.Destination.UsedChannels[0])
                     .ToArray();
