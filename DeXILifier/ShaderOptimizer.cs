@@ -1,5 +1,6 @@
 ﻿namespace DX9ShaderHLSLifier
 {
+    using SharpDX.Direct3D9;
     using System;
     using System.Collections.Generic;
     using System.Diagnostics;
@@ -27,6 +28,19 @@
                 {
                     requirements[i].requiredBy.Add(this);
                 }
+            }
+
+            public bool Requires(DependencyLeaf otherLeaf)
+            {
+                for (int i = 0; i < requirements.Length; i++)
+                {
+                    if (requirements[i] == otherLeaf || requirements[i].Requires(otherLeaf))
+                    {
+                        return true;
+                    }
+                }
+
+                return true;
             }
 
             public bool AreRequirementsMet(Predicate<Statement> present)
@@ -70,6 +84,11 @@
                 }
 
                 return didAnything;
+            }
+
+            public override string ToString()
+            {
+                return $"L{statement.lines[0]}:{statement}";
             }
         }
 
@@ -409,7 +428,7 @@
 
         private void ReassembleSplitOperations()
         {
-            HashSet< System.Type> oftenSplitInstructions = new HashSet<System.Type>
+            HashSet<System.Type> oftenSplitInstructions = new HashSet<System.Type>
             {
                 typeof(Instructions.Exponential),
                 typeof(Instructions.Log)
@@ -505,7 +524,7 @@
                 // New statement
                 Statement groupedExp = new Statement(
                     originalLines.ToArray(),
-                    head.Instruction, 
+                    head.Instruction,
                     new VariableData(headVariableData.variable, headVariableData.modifiers, forWrite: true, writtenChannels),
                     argument);
 
@@ -540,7 +559,7 @@
                 }
             }
 
-            foreach(var kv in halvedVariables)
+            foreach (var kv in halvedVariables)
             {
                 if (halvedVariables[kv.Key])
                 {
@@ -626,13 +645,13 @@
                 ShrinkDataToDestinations();
             }
         }
-        
+
         private void RenameVariables()
         {
             HashSet<string> takenNames = new HashSet<string>();
             HashSet<Variable> renamedVariables = new HashSet<Variable>();
 
-            string getFreeName(string usage, int index=0)
+            string getFreeName(string usage, int index = 0)
             {
                 string name = $"var_{usage}";
 
@@ -720,7 +739,7 @@
                                 renamedVariables.Add(varData.variable);
                             }
                         }
-                    } 
+                    }
                 }
             }
         }
@@ -779,13 +798,13 @@
                 }
             }
 
-            foreach(var kv in channelUseMask)
+            foreach (var kv in channelUseMask)
             {
                 System.Diagnostics.Debug.Assert(kv.Value > 0);
 
                 Variable variable = kv.Key;
                 byte channelsUsed = kv.Value;
-                
+
                 if (variable.writtenChannels != channelsUsed)
                 {
                     variable.writtenChannels = channelsUsed;
@@ -868,43 +887,57 @@
                 return existingLeaf;
             }
 
-            List<VariableChannel> requiredVariableChannels = new List<VariableChannel>();
+            List<VariableChannel> requiredWrittenVariableChannels = new List<VariableChannel>();
+            List<VariableChannel> optionalReadVariableChannels = new List<VariableChannel>();
             for (int i = 0; i < statement.Arguments.Length; i++)
             {
                 if (statement.Arguments[i] is VariableData variableData)
                 {
                     for (int channelIndex = 0; channelIndex < variableData.UsedChannels.Length; channelIndex++)
                     {
-                        if (requiredVariableChannels.FindIndex(o=>o.usedChannel == variableData.UsedChannels[channelIndex] && o.variable == variableData.variable) >= 0)
+                        if (requiredWrittenVariableChannels.FindIndex(o => o.usedChannel == variableData.UsedChannels[channelIndex] && o.variable == variableData.variable) >= 0)
                         {
                             continue; // Do not add redundant dependencies
                         }
 
-                        requiredVariableChannels.Add(new VariableChannel(variableData.UsedChannels[channelIndex], variableData.variable));
+                        requiredWrittenVariableChannels.Add(new VariableChannel(variableData.UsedChannels[channelIndex], variableData.variable));
                     }
                 }
             }
 
-            if ( statement.lines[0] == 67)
+
+            // Another hidden dependancy that statements have is the LAST ACCESS of the variable they're about to overwrite
+            // A statement that writes into a variable X cannot occur if X needs to be read at a prior time than it is about to be rewritten
             {
-                Debug.Write("");
+                if (statement.Destination is VariableData variableData)
+                {
+                    for (int channelIndex = 0; channelIndex < variableData.UsedChannels.Length; channelIndex++)
+                    {
+                        if (optionalReadVariableChannels.FindIndex(o => o.usedChannel == variableData.UsedChannels[channelIndex] && o.variable == variableData.variable) >= 0)
+                        {
+                            continue; // Do not add redundant dependencies
+                        }
+
+                        optionalReadVariableChannels.Add(new VariableChannel(variableData.UsedChannels[channelIndex], variableData.variable));
+                    }
+                }
             }
 
             // Find relatives
             HashSet<Statement> family = new HashSet<Statement>();
-            if (requiredVariableChannels.Count > 0)
+            if (requiredWrittenVariableChannels.Count > 0)
             {
                 // Going up through the code starting from here
                 int selfIndex = statements.IndexOf(statement);
 
-                for (int i = selfIndex-1; i >= 0; i--)
+                for (int i = selfIndex - 1; i >= 0; i--)
                 {
                     if (statements[i].Destination is VariableData otherStatementVariableData)
                     {
 
-                        for (int rqVariableIndex = 0; rqVariableIndex < requiredVariableChannels.Count; rqVariableIndex++)
+                        for (int rqVariableIndex = 0; rqVariableIndex < requiredWrittenVariableChannels.Count; rqVariableIndex++)
                         {
-                            VariableChannel varChan = requiredVariableChannels[rqVariableIndex];
+                            VariableChannel varChan = requiredWrittenVariableChannels[rqVariableIndex];
                             Variable lookingForVariable = varChan.variable;
 
                             if (lookingForVariable == otherStatementVariableData.variable)
@@ -916,7 +949,7 @@
 
                                     if (channelUsed == varChan.usedChannel)
                                     {
-                                        requiredVariableChannels.RemoveAt(rqVariableIndex);
+                                        requiredWrittenVariableChannels.RemoveAt(rqVariableIndex);
                                         family.Add(statements[i]); // It's okay if we add it multiple times
                                         rqVariableIndex--;
                                         break; // Jump to next variable channel
@@ -926,14 +959,44 @@
                         }
                     }
 
-                    if (requiredVariableChannels.Count <= 0)
+                    // Read dependency
+                    for (int otherStatementArgumentsIndex = 0; otherStatementArgumentsIndex < statements[i].Arguments.Length; otherStatementArgumentsIndex++)
+                    {
+                        if (statements[i].Arguments[otherStatementArgumentsIndex] is VariableData otherStatementVariableInput)
+                        {
+                            for (int readVariableChannelIndex = 0; readVariableChannelIndex < optionalReadVariableChannels.Count; readVariableChannelIndex++)
+                            {
+                                VariableChannel varChan = optionalReadVariableChannels[readVariableChannelIndex];
+                                Variable lookingForVariable = varChan.variable;
+
+                                if (lookingForVariable == otherStatementVariableInput.variable)
+                                {
+                                    // It's the right variable, so now we eliminate the widths
+                                    for (int otherStatementUsedChannelIndex = 0; otherStatementUsedChannelIndex < otherStatementVariableInput.UsedChannels.Length; otherStatementUsedChannelIndex++)
+                                    {
+                                        byte channelUsed = otherStatementVariableInput.UsedChannels[otherStatementUsedChannelIndex];
+
+                                        if (channelUsed == varChan.usedChannel)
+                                        {
+                                            optionalReadVariableChannels.RemoveAt(readVariableChannelIndex);
+                                            family.Add(statements[i]); // It's okay if we add it multiple times
+                                            readVariableChannelIndex--;
+                                            break; // Jump to next variable channel
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    if (requiredWrittenVariableChannels.Count <= 0 && optionalReadVariableChannels.Count <= 0)
                     {
                         break; // We're done seeking dependencies
                     }
                 }
 
                 // This will break if the variables and origins/destinations have not been properly shrunk
-                System.Diagnostics.Debug.Assert(requiredVariableChannels.Count == 0);
+                System.Diagnostics.Debug.Assert(requiredWrittenVariableChannels.Count == 0);
 
                 // Not removing the whole family from remaining statments because some dependencies can be multiple
             }
@@ -949,12 +1012,7 @@
             // Sort family by some criterias so it looks nicer
             Statement[] familyArray =
                 family
-                    .OrderBy(o=>o.lines.Min())
-                    // These will almost never come into effect
-                    // The issue is you gotta keep the line order for dependencies as an insurance against dependency erasure via rewrites
-                    // Reordering is done later anyway so this might not be a big deal
-                    // But if you mess up the ordering here, the whole program is dead (nested dependencies are not managed. they should be)
-                    .ThenBy(o => o.Destination is ResourceData rsc && rsc.resource is Output)
+                    .OrderBy(o => o.Destination is ResourceData rsc && rsc.resource is Output)
                     .ThenBy(o => o.Destination.UsedChannels.Length)
                     .ThenBy(o => o.Destination.UsedChannels[0])
                     .ToArray();
@@ -964,7 +1022,6 @@
                 DependencyLeaf familyLeaf = GrabLeaf(familyMember, statements, existingLeaves);
                 familyLeaves.Add(familyLeaf);
             }
-
 
             DependencyLeaf baseLeaf = new DependencyLeaf(statement, familyLeaves.ToArray());
             existingLeaves.Add(statement, baseLeaf);

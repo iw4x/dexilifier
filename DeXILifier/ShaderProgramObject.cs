@@ -4,6 +4,7 @@
     using System;
     using System.Collections.Generic;
     using System.Diagnostics;
+    using System.IO;
     using System.Linq;
     using System.Reflection;
     using System.Resources;
@@ -273,6 +274,38 @@
                     {
                         constant = new KnownConstant("GAMMA", 2.4f);
                     }
+                    else if (approxEquals(value, (float)Math.Log(Math.E, 2)))
+                    {
+                        constant = new KnownConstant("LOG2E", (float)Math.Log(Math.E, 2));
+                    }
+                    else if (approxEquals(value, (float)Math.Log10(Math.E)))
+                    {
+                        constant = new KnownConstant("LOG10E", (float)Math.Log10(Math.E));
+                    }
+                    else if (approxEquals(value, (float)Math.E))
+                    {
+                        constant = new KnownConstant("E", (float)Math.E);
+                    }
+                    else if (approxEquals(value, (float)Math.Sqrt(Math.E)))
+                    {
+                        constant = new KnownConstant("SQRT_E", (float)Math.Sqrt(Math.E));
+                    }
+                    else if (approxEquals(value, (float)0.017453))
+                    {
+                        constant = new KnownConstant("DEG2RAD", (float)0.017453);
+                    }
+                    else if (approxEquals(value, (float)57.2957))
+                    {
+                        constant = new KnownConstant("RAD2DEG", (float)57.2957);
+                    }
+                    else if (approxEquals(value, (float)Math.Cos(1)))
+                    {
+                        constant = new KnownConstant("COS1", (float)Math.Cos(1));
+                    }
+                    else if (approxEquals(value, (float)Math.Sin(1)))
+                    {
+                        constant = new KnownConstant("SIN1", (float)Math.Sin(1));
+                    }
 
                     return constant.Valid;
                 }
@@ -311,7 +344,7 @@
                     {
                         if (knownConstants[i].Valid)
                         {
-                            lines.Add(new DecompiledBlock($"#define {knownConstants[i].name} {knownConstants[i].value};", indent: 0, DeclaredAtLine.HasValue ? DeclaredAtLine.Value : 0));
+                            lines.Add(new DecompiledBlock($"#define {knownConstants[i].name} {knownConstants[i].value}", indent: 0, DeclaredAtLine.HasValue ? DeclaredAtLine.Value : 0));
                         }
                         else
                         {

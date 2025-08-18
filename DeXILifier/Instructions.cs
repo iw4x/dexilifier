@@ -2,6 +2,7 @@
 {
     using System;
     using System.Collections.Generic;
+    using System.Linq;
     using System.Reflection;
     using static DX9ShaderHLSLifier.ShaderProgramObject;
 
@@ -208,8 +209,11 @@
                     CodeData otherArg = arguments[0].ResourceHashCode == destination.ResourceHashCode ?
                         arguments[1] : arguments[0];
 
-                    result = $"{destination.GetDecompiledName()} *= {FormatCall(destination, new CodeData[] { otherArg })}";
-                    return true;
+                    if (otherArg.UsedChannels.SequenceEqual(destination.UsedChannels))
+                    {
+                        result = $"{destination.GetDecompiledName()} *= {FormatCall(destination, new CodeData[] { otherArg })}";
+                        return true;
+                    }
                 }
 
 
@@ -510,10 +514,12 @@
                     CodeData otherArg = arguments[0].ResourceHashCode == destination.ResourceHashCode ?
                         arguments[1] : arguments[0];
 
-                    result = $"{destination.GetDecompiledName()} += {FormatCall(destination, new CodeData[] { otherArg })}";
-                    return true;
+                    if (otherArg.UsedChannels.SequenceEqual(destination.UsedChannels))
+                    {
+                        result = $"{destination.GetDecompiledName()} += {FormatCall(destination, new CodeData[] { otherArg })}";
+                        return true;
+                    }
                 }
-
 
                 return base.FormatLine(destination, arguments, out result);
             }

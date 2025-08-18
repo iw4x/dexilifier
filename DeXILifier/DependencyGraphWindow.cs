@@ -189,6 +189,11 @@
                 {
                     DependencyGraph.Leaf leaf = workList[i];
 
+                    if (leafViews.ContainsKey(leaf.statement))
+                    {
+                        continue;
+                    }
+
                     StringBuilder sb = new StringBuilder();
                     string linesName = "?";
 
