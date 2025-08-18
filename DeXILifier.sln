@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.7.34031.279
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DeXILifier", "DeXILifier\DeXILifier.csproj", "{57B7DA00-53FF-4A85-A881-E6559316A63C}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug_PocPS|Any CPU = Debug_PocPS|Any CPU
+		Debug_PocVS|Any CPU = Debug_PocVS|Any CPU
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{57B7DA00-53FF-4A85-A881-E6559316A63C}.Debug_PocPS|Any CPU.ActiveCfg = Debug_PocPS|Any CPU
+		{57B7DA00-53FF-4A85-A881-E6559316A63C}.Debug_PocPS|Any CPU.Build.0 = Debug_PocPS|Any CPU
+		{57B7DA00-53FF-4A85-A881-E6559316A63C}.Debug_PocVS|Any CPU.ActiveCfg = Debug_PocVS|Any CPU
+		{57B7DA00-53FF-4A85-A881-E6559316A63C}.Debug_PocVS|Any CPU.Build.0 = Debug_PocVS|Any CPU
+		{57B7DA00-53FF-4A85-A881-E6559316A63C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{57B7DA00-53FF-4A85-A881-E6559316A63C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{57B7DA00-53FF-4A85-A881-E6559316A63C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{57B7DA00-53FF-4A85-A881-E6559316A63C}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {CAAF038B-890D-45C0-A3BB-3CE2ED15E3C7}
+	EndGlobalSection
+EndGlobal
