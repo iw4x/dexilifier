@@ -97,9 +97,9 @@
             public class MxMultiply : Instruction
             {
                 public override bool OutputInputAreSameSize => false;
-                public override int[] InputsMaximumWidth => new int[] { rows, rows * columns };
+                public override int[] InputsMaximumWidth => new int[] { columns, rows * columns };
 
-                public byte IndividualChannelWidth => columns;
+                public byte IndividualChannelWidth => rows;
 
                 public override int OutputMaximumWidth => columns;
 
@@ -119,7 +119,18 @@
 
                 protected override string FormatCallInternal(params string[] arguments)
                 {
-                    return string.Format("mul({0}, {1})", arguments);
+                    string op = string.Format("mul({0}, {1})", arguments);
+
+                    if (IndividualChannelWidth != OutputMaximumWidth)
+                    {
+                        op += '.';
+                        for (byte i = 0; i < IndividualChannelWidth; i++)
+                        {
+                            op += i.VectorChannel();
+                        }
+                    }
+
+                    return op;
                 }
             }
 
@@ -127,13 +138,14 @@
 
             public IReadOnlyList<Statement> Statements => statements;
 
-            private int Width => Front.Destination.GetDataWidth();
+            private readonly byte width;
 
             private readonly Statement[] statements = new Statement[4];
 
             private MatrixDotGroup(Statement initialStatement)
             {
                 statements[0] = initialStatement;
+                width = initialStatement.Instruction.knownWidth ?? initialStatement.Destination.GetDataWidth();
             }
 
             public Statement Build()
@@ -154,13 +166,14 @@
                         ).resource as MatrixChannelAccessResource
                     ).matrix;
 
+                System.Diagnostics.Debug.Assert(matrix.rows >= width);
+
                 MxMultiply instruction = new MxMultiply(
                     @base.Instruction.modifiers.isHalfPrecision,
-                    matrix.rows,
-                    matrix.columns
+                    width,
+                    matrix.columns // Rows and columns are identical here because we know the output width is gonna be the same as the number of grouped operations
                 );
 
-                CodeData destination = @base.Destination;
 
                 byte[] destinationChannels = new byte[instruction.IndividualChannelWidth];
                 for (byte i = 0; i < destinationChannels.Length; i++)
@@ -168,6 +181,16 @@
                     destinationChannels[i] = i;
                 }
 
+                byte[] sourceChannels = new byte[instruction.OutputMaximumWidth]; // You have to play that game
+                for (byte i = 0; i < sourceChannels.Length; i++)
+                {
+                    sourceChannels[i] = 
+                        statements[i] == null ?
+                        (i == 0 ? i : sourceChannels[i-1]) : // Compiler does not care whether this is invalid or not, so it's fine. Repeating the previous swizzle gets us around
+                        Front.Arguments[0].UsedChannels[i];
+                }
+
+                CodeData destination = @base.Destination;
                 destination.SetChannels(destinationChannels);
 
                 CodeData[] arguments = new CodeData[@base.Arguments.Length];
@@ -189,7 +212,7 @@
                         if (arguments[i].GetDataWidth() >= instruction.OutputMaximumWidth &&
                             arguments[i].UsedChannels.Length < arguments[i].GetDataWidth())
                         {
-                            arguments[i].SetChannels(destinationChannels);
+                            arguments[i].SetChannels(sourceChannels);
                         }
                     }
                 }
@@ -208,7 +231,7 @@
 
             public bool IsComplete()
             {
-                return statements[Width - 1] != null;
+                return statements[width - 1] != null;
             }
 
             public bool Accept(Statement statement)
@@ -219,7 +242,7 @@
 
                     bool equals(byte[] channelsA, byte[] channelsB)
                     {
-                        if(channelsA.Length != channelsB.Length)
+                        if (channelsA.Length != channelsB.Length)
                         {
                             return false;
                         }
@@ -237,7 +260,7 @@
 
                     for (int argumentIndex = 0; argumentIndex < statement.Arguments.Length; argumentIndex++)
                     {
-                        for (int i = 0; i < Width; i++)
+                        for (int i = 0; i < width; i++)
                         {
                             if (statements[i] == null)
                             {
@@ -396,6 +419,9 @@
             ReassembleMatrixMultiplications();
             HalveVariables();
 
+            ReassembleSquareRoot();
+            ReassembleVectorLength(); // Must happen AFTER Sqrt
+
             AdjustDataSize(); // We have to do it again
         }
 
@@ -430,12 +456,115 @@
             leaves.AddRange(highestLeaves);
         }
 
+        private delegate bool AreStatementsLinkedDelegate(Statement a, Statement b);
+        private delegate Statement MakeCombinedStatement(int[] lines, Statement a, Statement b);
+
+        private void CombineSuccessiveStatements<T1, T2>(AreStatementsLinkedDelegate areStatementsLinked, MakeCombinedStatement factory) where T1 : Instruction where T2 : Instruction
+        {
+            List<Statement> awaitingSequences = new List<Statement>();
+            for (int statementIndex = 0; statementIndex < statements.Count; statementIndex++)
+            {
+                Statement statement = statements[statementIndex];
+
+                if (statement is Comment)
+                {
+                    continue;
+                }
+
+                {
+                    if (statement.Instruction is T1 sequenceBegin)
+                    {
+                        awaitingSequences.Add(statement);
+                        continue;
+                    }
+                }
+
+                if (statement.Instruction is T2 nextSequence)
+                {
+                    if (awaitingSequences.Find((o) => areStatementsLinked(o, statement)) is Statement sequenceBegin)
+                    {
+                        // We can link them
+                        statements.Remove(sequenceBegin);
+                        statements.Remove(statement);
+
+                        List<int> lines = new List<int>(sequenceBegin.lines);
+                        lines.AddRange(statement.lines);
+
+                        var combinedOp = factory(lines.ToArray(), sequenceBegin, statement);
+
+                        statements.Insert(statementIndex - 1, combinedOp);
+                    }
+                }
+                else
+                {
+                    // It's been overwritten with something else - or somebody is reading the intermediate form
+                    awaitingSequences.RemoveAll((o) => o.Destination.ResourceHashCode == statement.Destination.ResourceHashCode);
+                    for (int i = 0; i < statement.Arguments.Length; i++)
+                    {
+                        awaitingSequences.RemoveAll((o) => o.Destination.ResourceHashCode == statement.Arguments[i].ResourceHashCode);
+                    }
+                }
+            }
+        }
+
+        private void ReassembleSquareRoot()
+        {
+            CombineSuccessiveStatements<Instructions.ReciprocalSquareRoot, Instructions.Reciprocal>((a, b) =>
+            {
+                return a.Destination.ResourceHashCode == b.Arguments[0].ResourceHashCode;
+            }, (int[] lines, Statement a, Statement b) =>
+            {
+
+                VariableData dest = b.Destination as VariableData;
+
+                System.Diagnostics.Debug.Assert(dest != null);
+                System.Diagnostics.Debug.Assert(a.Arguments.Length == 1);
+
+                return new Statement(
+                            lines,
+                            new Instructions.SquareRoot(b.Instruction.modifiers),
+                            new VariableData(dest.variable, dest.modifiers, forWrite: true, dest.UsedChannels),
+                            a.Arguments
+                        );
+            });
+        }
+
+        private void ReassembleVectorLength()
+        {
+
+            CombineSuccessiveStatements<Instructions.DotProduct, Instructions.SquareRoot>((a, b) =>
+            {
+                return
+                    // dot(x,x) => sqrmagnitude
+                    a.Arguments[0].ResourceHashCode == a.Arguments[1].ResourceHashCode &&
+
+                    // sqrt(sqrmagnitude) => length
+                    a.Destination.ResourceHashCode == b.Arguments[0].ResourceHashCode;
+            }, (int[] lines, Statement a, Statement b) =>
+            {
+
+                VariableData dest = b.Destination as VariableData;
+
+                System.Diagnostics.Debug.Assert(dest != null);
+                System.Diagnostics.Debug.Assert(a.Arguments.Length == 2);
+                System.Diagnostics.Debug.Assert(a.Arguments[0].ResourceHashCode == a.Arguments[1].ResourceHashCode);
+
+                return new Statement(
+                            lines,
+                            new Instructions.Length(b.Instruction.modifiers),
+                            new VariableData(dest.variable, dest.modifiers, forWrite: true, dest.UsedChannels),
+                            a.Arguments[0]
+                        );
+            });
+        }
+
+
         private void ReassembleSplitOperations()
         {
             HashSet<System.Type> oftenSplitInstructions = new HashSet<System.Type>
             {
                 typeof(Instructions.Exponential),
-                typeof(Instructions.Log)
+                typeof(Instructions.Log),
             };
 
             int streakLength = 0;

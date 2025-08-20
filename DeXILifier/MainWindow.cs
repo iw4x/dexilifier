@@ -483,7 +483,8 @@
             ColorSyntax(box, @"([0-z]+)\(.*\)", Color.DarkGreen);
             ColorSyntax(box, @"(\/\/.*)", Color.Magenta);
             ColorSyntax(box, @"#(.*)", Color.DarkGray);
-            ColorSyntax(box, @"((?:float|half)[0-9](?:x[0-9])?)", Color.Blue);
+            ColorSyntax(box, @"((?:float)[0-9]?(?:x[0-9])?)", Color.Blue);
+            ColorSyntax(box, @"((?:half)[0-9]?(?:x[0-9])?)", Color.Purple);
         }
 
 

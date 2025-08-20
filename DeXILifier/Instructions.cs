@@ -129,29 +129,13 @@
 
         public class DotProduct : Instruction
         {
+            // DP4 actually means that "at least one" of the entries has that width, not both
             public override int[] InputsMaximumWidth => new int[] { knownWidth.Value, knownWidth.Value, 1 };
 
             public override int OutputMaximumWidth => 1;
 
             public DotProduct(byte width, InstructionModifiers modifiers) : base(width, modifiers)
             {
-            }
-
-            public override bool Simplify(ShaderProgramObject.CodeData destination, ShaderProgramObject.CodeData[] arguments)
-            {
-                bool result = base.Simplify(destination, arguments);
-
-                int inputWidth = 4;
-                for (int i = 0; i < arguments.Length; i++)
-                {
-                    inputWidth = Math.Min(arguments[i].UsedChannels.Length, inputWidth);
-                }
-
-                // Shrink it
-                result |= Shrink(inputWidth, arguments);
-
-
-                return result;
             }
 
             protected override string FormatCallInternal(params string[] arguments)
@@ -438,6 +422,24 @@
             }
         }
 
+        public class SquareRoot : Instruction
+        {
+            public override int[] InputsMaximumWidth => new int[] { 4 };
+
+            public override bool OutputInputAreSameSize => true;
+
+            public SquareRoot(InstructionModifiers modifiers) : base(modifiers)
+            {
+            }
+
+            protected override string FormatCallInternal(params string[] arguments)
+            {
+                System.Diagnostics.Debug.Assert(arguments.Length == 1);
+
+                return string.Format("sqrt({0})", arguments);
+            }
+        }
+
         public class ReciprocalSquareRoot : Instruction
         {
             public override int[] InputsMaximumWidth => new int[] { 4 };
@@ -455,6 +457,27 @@
                 return string.Format("rsqrt({0})", arguments);
             }
         }
+
+        public class Length : Instruction
+        {
+            public override int[] InputsMaximumWidth => new int[] { 4 };
+
+            public override int OutputMaximumWidth => 1;
+
+            public override bool OutputInputAreSameSize => false;
+
+            public Length(InstructionModifiers modifiers) : base(modifiers)
+            {
+            }
+
+            protected override string FormatCallInternal(params string[] arguments)
+            {
+                System.Diagnostics.Debug.Assert(arguments.Length == 1);
+
+                return string.Format("length({0})", arguments);
+            }
+        }
+
         public class SinCos : Instruction
         {
             public override int[] InputsMaximumWidth => new int[] { 1 };
