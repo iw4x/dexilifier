@@ -9,5 +9,7 @@
         public bool renameVariablesBasedOnUsage;
 
         public bool reduceInstructions;
+
+        public bool alwaysCreateNewVariables;
     }
 }

@@ -219,7 +219,11 @@
 
                     bool equals(byte[] channelsA, byte[] channelsB)
                     {
-                        System.Diagnostics.Debug.Assert(channelsA.Length == channelsB.Length);
+                        if(channelsA.Length != channelsB.Length)
+                        {
+                            return false;
+                        }
+
                         for (int i = 0; i < channelsA.Length; i++)
                         {
                             if (channelsA[i] != channelsB[i])

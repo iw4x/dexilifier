@@ -4,11 +4,13 @@
     using System;
     using System.Collections.Generic;
     using System.Diagnostics;
+    using System.Globalization;
     using System.IO;
     using System.Linq;
     using System.Reflection;
     using System.Resources;
     using System.Runtime.Remoting.Channels;
+    using System.Security.Cryptography;
     using System.Text;
     using System.Text.RegularExpressions;
 
@@ -729,7 +731,7 @@
 
                 if (modifiers.isNegated)
                 {
-                    name = "-" + name;
+                    name = $"(-{name})";
                 }
 
                 return name;
@@ -739,6 +741,8 @@
         public class ResourceData : CodeData
         {
             public override int ResourceHashCode => resource.GetHashCode();
+
+            public override bool RepresentsColor => resource is Input input && input.MemberName.ToLower().Contains("color");
 
             public readonly ShaderResource resource;
 
@@ -1074,10 +1078,13 @@
 
             private readonly bool isVertexShader;
 
+            private readonly OptimizationParameters parameters;
+
             private int variableId = 0;
 
-            public ShaderState(bool isVertexShader, Dictionary<string, ShaderResource> resources)
+            public ShaderState(bool isVertexShader, OptimizationParameters parameters, Dictionary<string, ShaderResource> resources)
             {
+                this.parameters = parameters;
                 this.isVertexShader = isVertexShader;
                 this.resources = resources;
 
@@ -1185,24 +1192,32 @@
 
                     bool shouldOverwrite = registers[registerIndex] == null;
 
+
                     if (!shouldOverwrite)
                     {
-                        // If the channels we're about to write is all that's ever been written to the variable
-                        // then it's a new variable
-                        byte writtenChannels = registers[registerIndex].writtenChannels;
-                        for (int channelIndex = 0; channelIndex < channels.Length; channelIndex++)
-                        {
-                            byte channel = (byte)(1 << channels[channelIndex]);
-
-                            if ((writtenChannels & channel) != 0)
-                            {
-                                writtenChannels = (byte)(writtenChannels & ~channel);
-                            }
-                        }
-
-                        if (writtenChannels == 0)
+                        if (parameters.alwaysCreateNewVariables)
                         {
                             shouldOverwrite = true;
+                        }
+                        else
+                        {
+                            // If the channels we're about to write is all that's ever been written to the variable
+                            // then it's a new variable
+                            byte writtenChannels = registers[registerIndex].writtenChannels;
+                            for (int channelIndex = 0; channelIndex < channels.Length; channelIndex++)
+                            {
+                                byte channel = (byte)(1 << channels[channelIndex]);
+
+                                if ((writtenChannels & channel) != 0)
+                                {
+                                    writtenChannels = (byte)(writtenChannels & ~channel);
+                                }
+                            }
+
+                            if (writtenChannels == 0)
+                            {
+                                shouldOverwrite = true;
+                            }
                         }
                     }
 
@@ -1302,13 +1317,18 @@
 
         private readonly bool isVertexShader = false;
 
+        private readonly OptimizationParameters parameters;
+
         private DependencyGraph dependencyGraph = new DependencyGraph();
 
         private bool incomplete;
 
-        public ShaderProgramObject(bool vertexShader)
+
+
+        public ShaderProgramObject(bool vertexShader, in OptimizationParameters parameters)
         {
             isVertexShader = vertexShader;
+            this.parameters = parameters;
         }
 
         public static byte GetWidth(byte channels)
@@ -1577,7 +1597,7 @@
 
             // Parse assembly body
             string[] lines = body.Split('\n');
-            ShaderState state = new ShaderState(isVertexShader, resources);
+            ShaderState state = new ShaderState(isVertexShader, parameters, resources);
 
             for (int i = 0; i < lines.Length; i++)
             {
@@ -1589,6 +1609,15 @@
                 {
                     throw new Exception($"At line {lines[i]} : {e}", e);
                 }
+            }
+
+            if (incomplete)
+            {
+                // No optimization
+            }
+            else
+            {
+                Optimize();
             }
         }
 
@@ -1611,7 +1640,7 @@
             float[] valueFloats = new float[valueStrings.Length];
             for (int i = 0; i < valueStrings.Length; i++)
             {
-                valueFloats[i] = Convert.ToSingle(valueStrings[i].Trim());
+                valueFloats[i] = Convert.ToSingle(valueStrings[i].Trim(), CultureInfo.InvariantCulture);
             }
 
             state.resources.Add(registerName, new HardcodedExternalConstant($"k{chr}", valueFloats));
@@ -1743,7 +1772,7 @@
             ParseStatement(state, index, instruction, line.Substring(statement.Length).Trim(), modifiers);
         }
 
-        public void Optimize(OptimizationParameters parameters)
+        private void Optimize()
         {
             ShaderOptimizer optimizer = new ShaderOptimizer(parameters, statements);
 

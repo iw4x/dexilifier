@@ -51,6 +51,7 @@
             this.inputTextBox = new System.Windows.Forms.RichTextBox();
             this.decompilationProgressBar = new System.Windows.Forms.ProgressBar();
             this.settingsGroupBox = new System.Windows.Forms.GroupBox();
+            this.alwaysCreateVariablesBox = new System.Windows.Forms.CheckBox();
             this.reduceInstructionsBox = new System.Windows.Forms.CheckBox();
             this.renameVariablesBox = new System.Windows.Forms.CheckBox();
             this.inlineConstantsCheckBox = new System.Windows.Forms.CheckBox();
@@ -301,16 +302,28 @@
             // settingsGroupBox
             // 
             this.settingsGroupBox.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
+            this.settingsGroupBox.Controls.Add(this.alwaysCreateVariablesBox);
             this.settingsGroupBox.Controls.Add(this.reduceInstructionsBox);
             this.settingsGroupBox.Controls.Add(this.renameVariablesBox);
             this.settingsGroupBox.Controls.Add(this.inlineConstantsCheckBox);
             this.settingsGroupBox.Controls.Add(this.optimizeCheckBox);
             this.settingsGroupBox.Location = new System.Drawing.Point(410, 51);
             this.settingsGroupBox.Name = "settingsGroupBox";
-            this.settingsGroupBox.Size = new System.Drawing.Size(117, 147);
+            this.settingsGroupBox.Size = new System.Drawing.Size(117, 178);
             this.settingsGroupBox.TabIndex = 5;
             this.settingsGroupBox.TabStop = false;
             this.settingsGroupBox.Text = "Settings";
+            // 
+            // alwaysCreateVariablesBox
+            // 
+            this.alwaysCreateVariablesBox.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
+            | System.Windows.Forms.AnchorStyles.Right)));
+            this.alwaysCreateVariablesBox.Location = new System.Drawing.Point(6, 155);
+            this.alwaysCreateVariablesBox.Name = "alwaysCreateVariablesBox";
+            this.alwaysCreateVariablesBox.Size = new System.Drawing.Size(105, 17);
+            this.alwaysCreateVariablesBox.TabIndex = 4;
+            this.alwaysCreateVariablesBox.Text = "Immutable vars";
+            this.alwaysCreateVariablesBox.UseVisualStyleBackColor = true;
             // 
             // reduceInstructionsBox
             // 
@@ -661,5 +674,6 @@
         private System.Windows.Forms.TabPage shaderTab;
         private System.Windows.Forms.TabPage techniqueSetTab;
         internal TechniqueSetView techSetView;
+        private System.Windows.Forms.CheckBox alwaysCreateVariablesBox;
     }
 }

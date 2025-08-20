@@ -396,7 +396,7 @@
             {
                 System.Diagnostics.Debug.Assert(arguments.Length == 3);
 
-                return string.Format("lerp({0}, {1}, {2})", arguments);
+                return string.Format("lerp({1}, {2}, {0})", arguments);
             }
         }
 
@@ -516,7 +516,7 @@
 
                     if (otherArg.UsedChannels.SequenceEqual(destination.UsedChannels))
                     {
-                        result = $"{destination.GetDecompiledName()} += {FormatCall(destination, new CodeData[] { otherArg })}";
+                        result = $"{destination.GetDecompiledName()} {(otherArg.modifiers.isNegated ? "-" : "+")}= {FormatCall(destination, new CodeData[] { otherArg })}";
                         return true;
                     }
                 }

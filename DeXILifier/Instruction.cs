@@ -162,13 +162,13 @@
 
         protected bool NegateConstantIfNecessary(ResourceData data, out ResourceData newData)
         {
-            if (data.modifiers.isNegated)
+            /*if (data.modifiers.isNegated)
             {
                 newData = data.Duplicate();
                 newData.modifiers.isNegated = false;
                 return true;
             }
-            else if (data.resource is HardcodedExternalConstant constant)
+            else */if (data.resource is HardcodedExternalConstant constant)
             {
                 int negatedChannels = data.UsedChannels.Length;
 

@@ -59,7 +59,7 @@
 
             decompiled.rawOriginalText = asciiDecompiledCode;
 
-            ShaderProgramObject stateMachine = new ShaderProgramObject(isVertex);
+            ShaderProgramObject stateMachine = new ShaderProgramObject(isVertex, parameters);
 
             progress01?.Invoke(0.1f);
 
@@ -71,7 +71,6 @@
 
             if (!stateMachine.Incomplete)
             {
-                stateMachine.Optimize(parameters);
                 decompiled.dependencyGraph = stateMachine.DependencyGraph;
             }
 

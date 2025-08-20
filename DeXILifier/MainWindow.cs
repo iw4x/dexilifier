@@ -127,6 +127,7 @@
             declareParameter(renameVariablesBox, (b) => currentParameters.renameVariablesBasedOnUsage = b);
             declareParameter(inlineConstantsCheckBox, (b) => currentParameters.inlineConstants = b);
             declareParameter(reduceInstructionsBox, (b) => currentParameters.reduceInstructions = b);
+            declareParameter(alwaysCreateVariablesBox, (b) => currentParameters.alwaysCreateNewVariables = b);
 
             return () => { actions.ForEach(action => action.Invoke()); };
         }
