@@ -71,7 +71,7 @@
                 {
                     if (data.modifiers.isNegated)
                     {
-                        if (NegateConstantIfNecessary(data, out ResourceData newData))
+                        if (FlipSignIfMajorityIsNegative(data, out ResourceData newData))
                         {
                             newData.modifiers.isNegated = !data.modifiers.isNegated; // + to -
                             arguments[i] = newData;
@@ -161,15 +161,9 @@
             return false;
         }
 
-        protected bool NegateConstantIfNecessary(ResourceData data, out ResourceData newData)
+        protected bool FlipSignIfMajorityIsNegative(ResourceData data, out ResourceData newData)
         {
-            /*if (data.modifiers.isNegated)
-            {
-                newData = data.Duplicate();
-                newData.modifiers.isNegated = false;
-                return true;
-            }
-            else */if (data.resource is HardcodedExternalConstant constant)
+            if (data.resource is HardcodedExternalConstant constant)
             {
                 int negatedChannels = data.UsedChannels.Length;
 
@@ -213,6 +207,19 @@
 
                     return true;
                 }
+            }
+
+            newData = default;
+            return false;
+        }
+
+        protected bool NegateConstantIfPossible(ResourceData data, out ResourceData newData)
+        {
+            if (data.modifiers.isNegated)
+            {
+                newData = data.Duplicate();
+                newData.modifiers.isNegated = false;
+                return true;
             }
 
             newData = default;

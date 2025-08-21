@@ -740,7 +740,7 @@
                     CodeData argument = arguments[2];
                     if (argument is ResourceData data)
                     {
-                        if (NegateConstantIfNecessary(data, out ResourceData newData))
+                        if (NegateConstantIfPossible(data, out ResourceData newData))
                         {
                             strArguments[2] = newData.GetDecompiledName();
                             add = '-';
