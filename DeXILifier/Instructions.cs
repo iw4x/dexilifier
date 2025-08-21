@@ -539,7 +539,9 @@
 
                     if (otherArg.UsedChannels.SequenceEqual(destination.UsedChannels))
                     {
-                        result = $"{destination.GetDecompiledName()} {(otherArg.modifiers.isNegated ? "-" : "+")}= {FormatCall(destination, new CodeData[] { otherArg })}";
+                        bool isNegated = otherArg.modifiers.isNegated;
+                        otherArg.modifiers.isNegated = false;
+                        result = $"{destination.GetDecompiledName()} {(isNegated ? "-" : "+")}= {FormatCall(destination, new CodeData[] { otherArg })}";
                         return true;
                     }
                 }

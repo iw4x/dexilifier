@@ -204,7 +204,7 @@
                             mxChannels[channel] = (byte)channel;
                         }
 
-                        arguments[i] = new ResourceData(wide.matrix, data.isVertexShader, data.modifiers, mxChannels);
+                        arguments[i] = new ResourceData(wide.matrix, data.isVertexShader, data.modifiers, swizzle: false, mxChannels);
                     }
                     else
                     {
@@ -523,7 +523,7 @@
                 return new Statement(
                             lines,
                             new Instructions.SquareRoot(b.Instruction.modifiers),
-                            new VariableData(dest.variable, dest.modifiers, forWrite: true, dest.UsedChannels),
+                            new VariableData(dest.variable, dest.modifiers, forWrite: true, dest.ExplicitChannelAccess, dest.UsedChannels),
                             a.Arguments
                         );
             });
@@ -552,7 +552,7 @@
                 return new Statement(
                             lines,
                             new Instructions.Length(b.Instruction.modifiers),
-                            new VariableData(dest.variable, dest.modifiers, forWrite: true, dest.UsedChannels),
+                            new VariableData(dest.variable, dest.modifiers, forWrite: true, dest.ExplicitChannelAccess, dest.UsedChannels),
                             a.Arguments[0]
                         );
             });
@@ -647,7 +647,7 @@
                 }
                 else if (head.Arguments[0] is VariableData originalDestination)
                 {
-                    argument = new VariableData(originalDestination.variable, originalDestination.modifiers, forWrite: false, readChannels);
+                    argument = new VariableData(originalDestination.variable, originalDestination.modifiers, forWrite: false, originalDestination.ExplicitChannelAccess, readChannels);
                 }
                 else
                 {
@@ -658,7 +658,7 @@
                 Statement groupedExp = new Statement(
                     originalLines.ToArray(),
                     head.Instruction,
-                    new VariableData(headVariableData.variable, headVariableData.modifiers, forWrite: true, writtenChannels),
+                    new VariableData(headVariableData.variable, headVariableData.modifiers, forWrite: true, headVariableData.ExplicitChannelAccess, writtenChannels),
                     argument);
 
                 statements.Insert(insertionPoint, groupedExp);
@@ -1021,7 +1021,7 @@
             }
 
             List<VariableChannel> requiredWrittenVariableChannels = new List<VariableChannel>();
-            List<VariableChannel> optionalReadVariableChannels = new List<VariableChannel>();
+            List<VariableChannel> willModifyChannel = new List<VariableChannel>();
             for (int i = 0; i < statement.Arguments.Length; i++)
             {
                 if (statement.Arguments[i] is VariableData variableData)
@@ -1039,19 +1039,19 @@
             }
 
 
-            // Another hidden dependancy that statements have is the LAST ACCESS of the variable they're about to overwrite
+            // Another hidden dependancy that statements have is the LAST WRITE of the variable they're about to overwrite
             // A statement that writes into a variable X cannot occur if X needs to be read at a prior time than it is about to be rewritten
             {
                 if (statement.Destination is VariableData variableData)
                 {
                     for (int channelIndex = 0; channelIndex < variableData.UsedChannels.Length; channelIndex++)
                     {
-                        if (optionalReadVariableChannels.FindIndex(o => o.usedChannel == variableData.UsedChannels[channelIndex] && o.variable == variableData.variable) >= 0)
+                        if (willModifyChannel.FindIndex(o => o.usedChannel == variableData.UsedChannels[channelIndex] && o.variable == variableData.variable) >= 0)
                         {
                             continue; // Do not add redundant dependencies
                         }
 
-                        optionalReadVariableChannels.Add(new VariableChannel(variableData.UsedChannels[channelIndex], variableData.variable));
+                        willModifyChannel.Add(new VariableChannel(variableData.UsedChannels[channelIndex], variableData.variable));
                     }
                 }
             }
@@ -1062,6 +1062,7 @@
             {
                 // Going up through the code starting from here
                 int selfIndex = statements.IndexOf(statement);
+                Dictionary<VariableChannel, int> statementIndexAtWhichChannelIsReady = new Dictionary<VariableChannel, int>();
 
                 for (int i = selfIndex - 1; i >= 0; i--)
                 {
@@ -1082,6 +1083,7 @@
 
                                     if (channelUsed == varChan.usedChannel)
                                     {
+                                        statementIndexAtWhichChannelIsReady.Add(varChan, i);
                                         requiredWrittenVariableChannels.RemoveAt(rqVariableIndex);
                                         family.Add(statements[i]); // It's okay if we add it multiple times
                                         rqVariableIndex--;
@@ -1092,39 +1094,43 @@
                         }
                     }
 
-                    // Read dependency
-                    for (int otherStatementArgumentsIndex = 0; otherStatementArgumentsIndex < statements[i].Arguments.Length; otherStatementArgumentsIndex++)
+                    if (requiredWrittenVariableChannels.Count <= 0)
                     {
-                        if (statements[i].Arguments[otherStatementArgumentsIndex] is VariableData otherStatementVariableInput)
+                        break; // We're done seeking dependencies
+                    }
+                }
+
+                // Now we need to identify the read dependencies - AKA the statements that need to read our destination BEFORE we modify it
+                if (statement.Destination is VariableData destinationVarData)
+                {
+                    foreach (VariableChannel chan in statementIndexAtWhichChannelIsReady.Keys)
+                    {
+                        int readyLine = statementIndexAtWhichChannelIsReady[chan];
+                        for (int i = selfIndex - 1; i > readyLine; i--)
                         {
-                            for (int readVariableChannelIndex = 0; readVariableChannelIndex < optionalReadVariableChannels.Count; readVariableChannelIndex++)
+                            Statement dependency = statements[i];
+                            if (dependency is Comment)
                             {
-                                VariableChannel varChan = optionalReadVariableChannels[readVariableChannelIndex];
-                                Variable lookingForVariable = varChan.variable;
+                                continue;
+                            }
 
-                                if (lookingForVariable == otherStatementVariableInput.variable)
+                            for (int argIndex = 0; argIndex < dependency.Arguments.Length; argIndex++)
+                            {
+                                if (dependency.Arguments[argIndex] is VariableData variableData &&
+                                    variableData.variable == destinationVarData.variable) // uh oh
                                 {
-                                    // It's the right variable, so now we eliminate the widths
-                                    for (int otherStatementUsedChannelIndex = 0; otherStatementUsedChannelIndex < otherStatementVariableInput.UsedChannels.Length; otherStatementUsedChannelIndex++)
+                                    for (int channelIndex = 0; channelIndex < variableData.UsedChannels.Length; channelIndex++)
                                     {
-                                        byte channelUsed = otherStatementVariableInput.UsedChannels[otherStatementUsedChannelIndex];
-
-                                        if (channelUsed == varChan.usedChannel)
+                                        byte channel = variableData.UsedChannels[channelIndex];
+                                        if (destinationVarData.UsesChannel(channel)) // UH OH
                                         {
-                                            optionalReadVariableChannels.RemoveAt(readVariableChannelIndex);
-                                            family.Add(statements[i]); // It's okay if we add it multiple times
-                                            readVariableChannelIndex--;
-                                            break; // Jump to next variable channel
+                                            family.Add(dependency); // They need to read it before we write it
+                                            break;
                                         }
                                     }
                                 }
                             }
                         }
-                    }
-
-                    if (requiredWrittenVariableChannels.Count <= 0 && optionalReadVariableChannels.Count <= 0)
-                    {
-                        break; // We're done seeking dependencies
                     }
                 }
 

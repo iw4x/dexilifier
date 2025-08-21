@@ -575,15 +575,31 @@
                     {
                         if (arguments[i] is VariableData variableData)
                         {
-                            for (byte channelIndex = 0; channelIndex < variableData.UsedChannels.Length; channelIndex++)
+                            if (instruction.OutputInputAreSameSize && 
+                                destination.UsedChannels.Length < arguments[i].UsedChannels.Length &&
+                                !arguments[i].ExplicitChannelAccess
+                                )
                             {
-                                byte channel = variableData.UsedChannels[channelIndex];
-                                // Unwritten channel is being read - we can shrink the statement, the data here is garbage
-                                if (!variableData.variable.HasChannelBeenWritten(channel))
-                                {
-                                    channelIndicesToKill.Add(channel);
-                                }
+                                // There's implicit swizzling based on destination
+                                //             var_D.zw = r0 - r1;
+                                //      =>     var_D.zw = r0.zw - r1.zw;  (not XY)
+                                // That also gives information on what parts of a variable MUST be written before access
+                                variableData.SetChannels(destination.UsedChannels);
                             }
+                            else
+                            {
+                                // Nothing to do
+                            }
+
+                            //for (byte channelIndex = 0; channelIndex < variableData.UsedChannels.Length; channelIndex++)
+                            //{
+                            //    byte channel = variableData.UsedChannels[channelIndex];
+                            //    // Unwritten channel is being read - we can shrink the statement, the data here is garbage
+                            //    if (!variableData.variable.HasChannelBeenWritten(channel))
+                            //    {
+                            //        channelIndicesToKill.Add(channel);
+                            //    }
+                            //}
                         }
                     }
 
@@ -661,12 +677,15 @@
 
             public byte[] UsedChannels => usedChannels;
 
+            public bool ExplicitChannelAccess { get; }
+
             private byte[] usedChannels;
 
-            protected CodeData(byte[] readChannels, DataModifiers modifiers)
+            protected CodeData(byte[] readChannels, bool explicitChannelAccess, DataModifiers modifiers)
             {
                 this.modifiers = modifiers;
                 this.usedChannels = readChannels;
+                this.ExplicitChannelAccess = explicitChannelAccess;
             }
 
             public void Shrink(int maxWidth)
@@ -675,6 +694,19 @@
                 Array.Copy(UsedChannels, newChannels, newChannels.Length);
 
                 SetChannels(newChannels);
+            }
+
+            public bool UsesChannel(byte channel)
+            {
+                for (int i = 0; i < usedChannels.Length; i++)
+                {
+                    if (usedChannels[i] == channel)
+                    {
+                        return true;
+                    }
+                }
+
+                return false;
             }
 
             public virtual void SetChannels(byte[] newChannels)
@@ -750,7 +782,7 @@
 
             public bool isInverted = false;
 
-            public ResourceData(ShaderResource resource, bool isVertexShader, DataModifiers modifiers, params byte[] readChannels) : base(readChannels, modifiers)
+            public ResourceData(ShaderResource resource, bool isVertexShader, DataModifiers modifiers, bool swizzle, params byte[] readChannels) : base(readChannels, swizzle, modifiers)
             {
                 this.resource = resource;
                 this.isVertexShader = isVertexShader;
@@ -758,7 +790,7 @@
 
             public ResourceData Duplicate()
             {
-                return new ResourceData(resource, isVertexShader, modifiers, UsedChannels)
+                return new ResourceData(resource, isVertexShader, modifiers, ExplicitChannelAccess, UsedChannels)
                 {
                     isInverted = isInverted
                 };
@@ -858,17 +890,17 @@
 
             public readonly bool forWrite;
 
-            public VariableData(Variable variable, DataModifiers modifiers, bool forWrite, params byte[] readChannels) : base(readChannels, modifiers)
+            public VariableData(Variable variable, DataModifiers modifiers, bool forWrite, bool swizzle, params byte[] readChannels) : base(readChannels, swizzle, modifiers)
             {
                 this.variable = variable;
                 this.forWrite = forWrite;
 
                 SetChannels(readChannels);
 
-                //if (!forWrite && !variable.HaveChannelsBeenWritten(this.UsedChannels))
-                //{
-                //    throw new Exception($"Tried to reference data that was not written yet!");
-                //}
+                if (!forWrite && !variable.HaveChannelsBeenWritten(this.UsedChannels))
+                {
+                    throw new Exception($"Tried to reference data that was not written yet!");
+                }
             }
 
             public override void SetChannels(byte[] newChannels)
@@ -924,7 +956,9 @@
                     //throw new Exception($"Read more channels than the variable was written to?");
                 }
 
-                bool needsExplicit = channels.Length != GetWidth(variable.writtenChannels);
+                bool needsExplicit = 
+                    channels.Length != GetWidth(variable.writtenChannels);
+
                 if (!needsExplicit) {
                     for (int i = 0; i < channels.Length; i++)
                     {
@@ -1097,7 +1131,7 @@
             /// Get it BEFORE destination
             public CodeData GetOrigin(int lineIndex, string name)
             {
-                name = GetChannels(name, out byte[] channels, out byte width);
+                name = GetChannels(name, out byte[] channels, out byte width, out bool explicitSwizzle);
 
                 CodeData.DataModifiers modifiers = new CodeData.DataModifiers();
 
@@ -1132,13 +1166,13 @@
                         throw new Exception($"Tried to read from a non-initialized register {registerIndex}!");
                     }
 
-                    origin = new VariableData(registers[registerIndex], modifiers, forWrite: false, channels);
+                    origin = new VariableData(registers[registerIndex], modifiers, forWrite: false, explicitSwizzle, channels);
                 }
                 else
                 {
                     if (resources.TryGetValue(name, out ShaderResource resource))
                     {
-                        origin = new ResourceData(resource, isVertexShader, modifiers, channels);
+                        origin = new ResourceData(resource, isVertexShader, modifiers, explicitSwizzle, channels);
                     }
                     else
                     {
@@ -1151,7 +1185,7 @@
 
             public CodeData GetDestination(int lineIndex, string name)
             {
-                name = GetChannels(name, out byte[] channels, out byte width);
+                name = GetChannels(name, out byte[] channels, out byte width, out bool swizzle);
 
                 CodeData.DataModifiers modifiers = new CodeData.DataModifiers();
 
@@ -1174,7 +1208,7 @@
                 {
                     if (resources.TryGetValue(name, out ShaderResource resource))
                     {
-                        destination = new ResourceData(resource, isVertexShader, modifiers, channels);
+                        destination = new ResourceData(resource, isVertexShader, modifiers, swizzle, channels);
                     }
                     else
                     {
@@ -1228,7 +1262,7 @@
 
                     Variable variable = registers[registerIndex];
 
-                    destination = new VariableData(variable, modifiers, forWrite: true, channels);
+                    destination = new VariableData(variable, modifiers, forWrite: true, swizzle, channels);
                 }
                 else
                 {
@@ -1272,13 +1306,15 @@
                 return name;
             }
 
-            private string GetChannels(string name, out byte[] channels, out byte width)
+            private string GetChannels(string name, out byte[] channels, out byte width, out bool explicitSwizzle)
             {
                 channels = new byte[] { 0, 1, 2, 3 };
                 width = (byte)channels.Length;
+                explicitSwizzle = false;
 
                 if (name.Contains('.'))
                 {
+                    explicitSwizzle = true;
                     int channelsStart = name.IndexOf('.') + 1;
                     width = (byte)(name.Length - channelsStart);
                     channels = new byte[width];

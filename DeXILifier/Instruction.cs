@@ -149,6 +149,7 @@
                          newConstant,
                          data.isVertexShader,
                          modifiers: data.modifiers,
+                         swizzle: true,
                          newUsedChannels
                      );
 
@@ -206,6 +207,7 @@
                          newConstant,
                          data.isVertexShader,
                          modifiers: data.modifiers,
+                         swizzle: true,
                          newUsedChannels
                      );
 
