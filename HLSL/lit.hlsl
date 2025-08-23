@@ -1,6 +1,8 @@
-//#define SUN 1
+#define SUN 1
 //#define DFOG 1
 #define SHADOW 1
+//#define PREMULTIPLIED_ALPHA 1
+#define VERTEX_COLOR 1
 
 extern sampler3D modelLightingSampler : register(s4);
 extern sampler2D colorMapSampler : register(s0);
@@ -27,28 +29,30 @@ extern float4 shadowmapSwitchPartition : register(c2);
 
 struct VSOutput
 {
-
+#if VERTEX_COLOR
     float3 color : COLOR0;
-    float2 texcoord : TEXCOORD0; // Texcoord
-    float4 texcoord1 : TEXCOORD1; // Normal (Worldspace) (UCHAR)
-#if SUN
-	float3 texcoord4 : TEXCOORD4;
+#endif
+    float2 texcoord : TEXCOORD0;
+    float4 wsNormal : TEXCOORD1; // w contain the depth used by the fog interpolation
+#if SHADOW
+	float3 shadowPos : TEXCOORD4;
 #endif
 
 #if DFOG
-    float3 texcoord5 : TEXCOORD5;
+    float3 fogNormal : TEXCOORD5;
 #endif
-    float3 texcoord6 : TEXCOORD6; // BaseLightingCoords
+    float3 baseLightingCoords : TEXCOORD6;
 };
 
 half4 SampleColorMap(VSOutput inputVx)
 {
     half4 var_colormap = tex2D(colorMapSampler, inputVx.texcoord);
+#if VERTEX_COLOR
     var_colormap.rgb *= inputVx.color;
-    var_colormap.rgb = var_colormap.rgb * var_colormap.rgb;
+#endif
+    var_colormap.rgb = pow(var_colormap.rgb, 2); // pseudo gamma correction
     
     return var_colormap;
-
 }
 
 half3 GetFogColor(VSOutput inputVx)
@@ -56,14 +60,12 @@ half3 GetFogColor(VSOutput inputVx)
     half3 fogColor;
     
 #if DFOG
-    half3 var_G = normalize(inputVx.texcoord5);
-	half sunFogVal = dot(fogSunDir.xyz, var_G);
+    half3 fogNormal = normalize(inputVx.fogNormal);
+	half sunFogVal = dot(fogSunDir.xyz, fogNormal);
 	sunFogVal = sunFogVal + fogSunConsts.y;
 	sunFogVal = saturate(sunFogVal * fogSunConsts.z);
 	
-	half3 fogColorComputed = fogSunColorLinear.xyz - fogColorLinear.xyz;
-	
-    fogColor = sunFogVal * fogColorComputed + fogColorLinear.xyz;
+    fogColor = lerp(fogColorLinear.xyz, fogSunColorLinear.xyz, sunFogVal);
 #else
     fogColor = fogColorLinear.xyz;
 #endif
@@ -71,57 +73,90 @@ half3 GetFogColor(VSOutput inputVx)
     return fogColor;
 }
 
-half3 MixColor(VSOutput inputVx, half3 baseColor, half3 lightingColor)
+half4 SampleAmbientLighting(half3 normalizedNormal, half3 baseLightingCoords)
 {
-    half3 colorMix = baseColor * lightingColor - GetFogColor(inputVx);
-    return colorMix;
+    half maxNormal = max(abs(normalizedNormal.x), max(abs(normalizedNormal.y), abs(normalizedNormal.z)));
+	
+    half3 probe_pos = (normalizedNormal * lightingLookupScale.xyz);
+    probe_pos = probe_pos / maxNormal + baseLightingCoords;
+    
+    half4 ambient = tex3D(modelLightingSampler, probe_pos);
+    return pow(2 * ambient, 2);
 }
 
-half3 SampleLighting(float3 normal, float3 baseLightingCoords)
+#if SHADOW
+half SampleShadowMap(float2 shadowPos, float bias, float ambient)
 {
-    half3 normalizedNorm = normalize(normal);
+    float4 shadowSample;
+	shadowSample.x = tex2Dlod(shadowmapSamplerSun, float4(shadowPos + sunShadowmapPixelAdjust.xy, 0, 0));
+	shadowSample.y = tex2Dlod(shadowmapSamplerSun, float4(shadowPos - sunShadowmapPixelAdjust.xy, 0, 0));
+	shadowSample.z = tex2Dlod(shadowmapSamplerSun, float4(shadowPos + sunShadowmapPixelAdjust.zw, 0, 0));
+	shadowSample.w = tex2Dlod(shadowmapSamplerSun, float4(shadowPos - sunShadowmapPixelAdjust.zw, 0, 0));
+
+	shadowSample = shadowSample - bias; // bias
+	shadowSample = (shadowSample >= 0 ? 1 : 0); // cutout
+	half shadowContribution = dot(shadowSample, 0.25); // average
+	
+	float2 shadowPartitionCoord = shadowPos * shadowmapSwitchPartition.w + shadowmapSwitchPartition.xy;
+	float4 shadowPartSample;
+    shadowPartSample.x = tex2Dlod(shadowmapSamplerSun, float4(shadowPartitionCoord + sunShadowmapPixelAdjust.xy, 0, 0));
+	shadowPartSample.y = tex2Dlod(shadowmapSamplerSun, float4(shadowPartitionCoord - sunShadowmapPixelAdjust.xy, 0, 0));
+	shadowPartSample.z = tex2Dlod(shadowmapSamplerSun, float4(shadowPartitionCoord + sunShadowmapPixelAdjust.zw, 0, 0));
+	shadowPartSample.w = tex2Dlod(shadowmapSamplerSun, float4(shadowPartitionCoord - sunShadowmapPixelAdjust.zw, 0, 0));
+	
+	shadowPartSample = shadowPartSample - bias; // bias
+	shadowPartSample = (shadowPartSample >= 0 ? 1 : 0); // cutout
+	half shadowPartContribution = dot(shadowPartSample, 0.25); // average
+
+	half4 shadowScale = half4(shadowPos, shadowPartitionCoord) * shadowmapScale.xyxy + shadowmapScale.zzzw;
+	// FIXME: understand this pazrt better and find name for variable
+	half2 var_N = max(abs(shadowScale.xz), abs(shadowScale.yw));
+	var_N = saturate(8 - var_N);
+	half var_H = var_N.x * -var_N.y + var_N.x;
+	var_H = (-abs(var_H) >= 0 ? var_N.x : 1);
+	half shadowPartAmbient = lerp(shadowPartContribution, ambient, var_N.y);
+	half shadow = lerp(shadowContribution, shadowPartAmbient, var_H);
     
-    half yzNormal = max(abs(normalizedNorm.y), abs(normalizedNorm.z));
-	
-    half maxNormal = max(abs(normalizedNorm.x), yzNormal);
-	
-    float4 var_D;
-    var_D.w = 1 / maxNormal;
-    var_D.xyz = normalizedNorm * lightingLookupScale.xyz;
-    var_D.xyz = var_D.xyz * var_D.w + baseLightingCoords;
-	
-	
-    half4 var_modellighting = tex3D(modelLightingSampler, var_D.xyz);
-    var_modellighting.rgb = var_modellighting.rgb + var_modellighting.rgb;
-    var_modellighting.rgb = var_modellighting.rgb * var_modellighting.rgb;
-    
-#if SUN
-    half var_sunA = saturate(dot(lightPosition.xyz, normalizedNorm));
-    half3 sunEffect = var_sunA * lightDiffuse.rgb;
-    var_modellighting.rgb += sunEffect;
+    return shadow;
+}
 #endif
-    
-    return var_modellighting;
-}
 
-half3 AddFogColor(VSOutput inputVx, half3 colorMix)
+#if SUN
+half3 GetSunLight(half3 normalizedNormal)
 {
-    half3 additiveFogColor = GetFogColor(inputVx);
+    half var_sunA = saturate(dot(lightPosition.xyz, normalizedNormal));
+    half3 sunEffect = var_sunA * lightDiffuse.rgb;
     
-    return inputVx.texcoord1.w * colorMix + additiveFogColor;
+    return sunEffect;
 }
-
+#endif
 
 half4 PSMain(VSOutput inputVx) : SV_Target
 {
     half4 outColor;
-	
-    half4 var_colormap = SampleColorMap(inputVx);
-    half3 var_modellighting = SampleLighting(inputVx.texcoord1.xyz, inputVx.texcoord6);
+
+    half4 diffuse = SampleColorMap(inputVx);
+    half3 normalizedNormal = normalize(inputVx.wsNormal.xyz);
+    half4 light = SampleAmbientLighting(normalizedNormal, inputVx.baseLightingCoords);
     
-    half3 colorMix = MixColor(inputVx, var_colormap.rgb, var_modellighting);
-	    
-    outColor.xyz = AddFogColor(inputVx, colorMix);
+#if SUN
+    half3 directionnalLight = GetSunLight(normalizedNormal);
+#if SHADOW
+    directionnalLight *= SampleShadowMap(inputVx.shadowPos.xy, inputVx.shadowPos.z, light.w);
+#endif
+    light.rgb += directionnalLight;
+#endif
+
+#if PREMULTIPLIED_ALPHA
+    diffuse.rgb *= diffuse.a;
+#endif
+
+    half3 additiveFogColor = GetFogColor(inputVx);
+#if PREMULTIPLIED_ALPHA
+    additiveFogColor *= diffuse.a;
+#endif
+
+    outColor.xyz = lerp(diffuse.rgb * light.rgb, additiveFogColor, 1 - inputVx.wsNormal.w);
     outColor.w = 1;
 
     return outColor;
