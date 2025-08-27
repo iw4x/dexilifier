@@ -568,52 +568,32 @@
                     {
                         arguments[i].NotifyUsedInStatement(this);
                     }
+                }
 
-                    // We can shrink the whole statement here if we notice some of the input variables have not been written fully to
-                    HashSet<byte> channelIndicesToKill = new HashSet<byte>();
-                    for (int i = 0; i < arguments.Length; i++)
+                if (instruction != null)
+                {
+                    // Now we can specify the arguments and/or destination depending on what instruction is used
+                    if (instruction.DestinationMaskDictatesInputWidth)
                     {
-                        if (arguments[i] is VariableData variableData)
+                        if (destination.ExplicitChannelAccess)
                         {
-                            if (instruction.OutputInputAreSameSize && 
-                                destination.UsedChannels.Length < arguments[i].UsedChannels.Length &&
-                                !arguments[i].ExplicitChannelAccess
-                                )
+                            // The operation is "masked" - inputs that are bigger than the destination use only select channels
+                            for (int i = 0; i < arguments.Length; i++)
                             {
-                                // There's implicit swizzling based on destination
-                                //             var_D.zw = r0 - r1;
-                                //      =>     var_D.zw = r0.zw - r1.zw;  (not XY)
-                                // That also gives information on what parts of a variable MUST be written before access
-                                variableData.SetChannels(destination.UsedChannels);
+                                if (destination.UsedChannels.Length < arguments[i].UsedChannels.Length ||
+                                    !arguments[i].ExplicitChannelAccess)
+                                {
+                                    byte[] newChannels = new byte[destination.UsedChannels.Length];
+                                    for (int channelIndex = 0; channelIndex < newChannels.Length; channelIndex++)
+                                    {
+                                        byte maskChannel = destination.UsedChannels[channelIndex];
+                                        newChannels[channelIndex] = arguments[i].UsedChannels[maskChannel];
+                                    }
+
+                                    arguments[i].SetChannels(newChannels);
+                                }
                             }
-                            else
-                            {
-                                // Nothing to do
-                            }
-
-                            //for (byte channelIndex = 0; channelIndex < variableData.UsedChannels.Length; channelIndex++)
-                            //{
-                            //    byte channel = variableData.UsedChannels[channelIndex];
-                            //    // Unwritten channel is being read - we can shrink the statement, the data here is garbage
-                            //    if (!variableData.variable.HasChannelBeenWritten(channel))
-                            //    {
-                            //        channelIndicesToKill.Add(channel);
-                            //    }
-                            //}
                         }
-                    }
-
-                    int killedSoFar = 0;
-                    foreach (byte indexToKill in channelIndicesToKill)
-                    {
-                        destination.KillChannel(indexToKill - killedSoFar);
-
-                        for (int i = 0; i < arguments.Length; i++)
-                        {
-                            arguments[i].KillChannel(indexToKill - killedSoFar);
-                        }
-
-                        killedSoFar++;
                     }
                 }
             }
@@ -1128,10 +1108,11 @@
                 }
             }
 
-            /// Get it BEFORE destination
-            public CodeData GetOrigin(int lineIndex, string name)
+            public CodeData GetOrigin(byte[] destinationChannels, bool destinationHasExplicitSwizzle, int lineIndex, string name)
             {
-                name = GetChannels(name, out byte[] channels, out byte width, out bool explicitSwizzle);
+                name = GetChannels(name, isDestination: false, out byte[] channels, out bool explicitSwizzle);
+
+                System.Diagnostics.Debug.Assert(destinationChannels.Length <= channels.Length);
 
                 CodeData.DataModifiers modifiers = new CodeData.DataModifiers();
 
@@ -1180,20 +1161,17 @@
                     }
                 }
 
+
                 return origin;
             }
 
-            public CodeData GetDestination(int lineIndex, string name)
+            public CodeData CreateDestination(
+                int lineIndex, 
+                string name, 
+                byte[] channels,
+                bool explicitSwizzle, 
+                CodeData.DataModifiers modifiers)
             {
-                name = GetChannels(name, out byte[] channels, out byte width, out bool swizzle);
-
-                CodeData.DataModifiers modifiers = new CodeData.DataModifiers();
-
-                name = GetNegation(name, out modifiers.isNegated);
-                name = GetAbs(name, out modifiers.isAbsolute);
-                name = GetSat(name, out modifiers.isSaturated);
-
-
                 bool isOutputRegister = name[0] == 'o';
                 bool isNormalRegister = name[0] == 'r';
 
@@ -1208,7 +1186,7 @@
                 {
                     if (resources.TryGetValue(name, out ShaderResource resource))
                     {
-                        destination = new ResourceData(resource, isVertexShader, modifiers, swizzle, channels);
+                        destination = new ResourceData(resource, isVertexShader, modifiers, explicitSwizzle, channels);
                     }
                     else
                     {
@@ -1262,7 +1240,7 @@
 
                     Variable variable = registers[registerIndex];
 
-                    destination = new VariableData(variable, modifiers, forWrite: true, swizzle, channels);
+                    destination = new VariableData(variable, modifiers, forWrite: true, explicitSwizzle, channels);
                 }
                 else
                 {
@@ -1270,6 +1248,22 @@
                 }
 
                 return destination;
+            }
+
+            public void GetDestinationInfo(int lineIndex, 
+                string parsedName,
+                out string name,
+                out byte[] channels,
+                out bool explicitSwizzle,
+                out CodeData.DataModifiers modifiers)
+            {
+                name = GetChannels(parsedName, isDestination: true, out channels, out explicitSwizzle);
+
+                modifiers = new CodeData.DataModifiers();
+
+                name = GetNegation(name, out modifiers.isNegated);
+                name = GetAbs(name, out modifiers.isAbsolute);
+                name = GetSat(name, out modifiers.isSaturated);
             }
 
             private string GetSat(string name, out bool isSaturated)
@@ -1306,23 +1300,30 @@
                 return name;
             }
 
-            private string GetChannels(string name, out byte[] channels, out byte width, out bool explicitSwizzle)
+            private string GetChannels(string name, bool isDestination, out byte[] channels, out bool explicitSwizzle)
             {
                 channels = new byte[] { 0, 1, 2, 3 };
-                width = (byte)channels.Length;
+                byte width = (byte)channels.Length;
                 explicitSwizzle = false;
 
                 if (name.Contains('.'))
                 {
                     explicitSwizzle = true;
                     int channelsStart = name.IndexOf('.') + 1;
-                    width = (byte)(name.Length - channelsStart);
-                    channels = new byte[width];
 
-                    for (int i = 0; i < width; i++)
+                    width = (byte)(name.Length - channelsStart);
+
+                    if (isDestination)
                     {
-                        char chan = name.Substring(channelsStart + i, 1)[0];
-                        channels[i] = chan.ByteChannel();
+                        // We truncate to exactly the right size
+                        channels = new byte[width];
+                    }
+
+                    for (int i = 0; i < channels.Length; i++)
+                    {
+                        int repeatingIndex = Math.Min(width - 1, i);
+                        char chan = name.Substring(channelsStart + repeatingIndex, 1)[0];
+                        channels[i] = chan.ByteChannel(); // XY => XYYY (4 channel wide)
                     }
 
                     // Remove it from the name
@@ -1831,7 +1832,8 @@
 
         private void ParseStatement(ShaderState state, int index, string instructionStr, string lineContents, InstructionModifiers modifiers)
         {
-            Instruction instruction = null;
+            Instruction instruction = ParseInstruction(instructionStr, modifiers);
+
             string[] elements = lineContents.Split(new string[] { ", " }, StringSplitOptions.None);
             string writtenData = elements[0];
             string[] readData = new string[elements.Length - 1];
@@ -1842,13 +1844,42 @@
                 throw new Exception($"Invalid instruction {lineContents}");
             }
 
+            state.GetDestinationInfo(
+                index, 
+                writtenData, 
+                out string destinationName,
+                out byte[] destChannels, 
+                out bool destSwizzle, 
+                out CodeData.DataModifiers destModifiers
+            );
+
             CodeData[] origins = new CodeData[readData.Length];
             for (int i = 0; i < readData.Length; i++)
             {
-                origins[i] = state.GetOrigin(index, readData[i]);
+                origins[i] = state.GetOrigin(destChannels, destSwizzle, index, readData[i]);
             }
 
-            CodeData destination = state.GetDestination(index, writtenData);
+            CodeData destination = state.CreateDestination(index, destinationName, destChannels, destSwizzle, destModifiers);
+
+            Statement statement;
+
+            
+
+            if (instruction == null)
+            {
+                statement = new Comment(index, $"L{index}: {instructionStr} {lineContents}");
+            }
+            else
+            {
+                statement = new Statement(index, instruction, destination, origins);
+            }
+
+            statements.Add(statement);
+        }
+
+        private Instruction ParseInstruction(string instructionStr, InstructionModifiers modifiers)
+        {
+            Instruction instruction = null;
 
             switch (instructionStr)
             {
@@ -1930,33 +1961,25 @@
 
                 case "texld":
                     {
-                        ResourceData rscData = origins[1] as ResourceData;
-                        Sampler sampler = rscData.resource as Sampler;
-                        instruction = new Instructions.SampleTexture(sampler.samplerType, modifiers);
+                        instruction = new Instructions.SampleTexture(modifiers);
                         break;
                     }
 
                 case "texldp":
-                {
-                        ResourceData rscData = origins[1] as ResourceData;
-                        Sampler sampler = rscData.resource as Sampler;
-                        instruction = new Instructions.SampleTextureProjected(sampler.samplerType, modifiers);
+                    {
+                        instruction = new Instructions.SampleTextureProjected(modifiers);
                         break;
                     }
 
                 case "texldb":
-                {
-                        ResourceData rscData = origins[1] as ResourceData;
-                        Sampler sampler = rscData.resource as Sampler;
-                        instruction = new Instructions.SampleTextureBias(sampler.samplerType, modifiers);
+                    {
+                        instruction = new Instructions.SampleTextureBias(modifiers);
                         break;
                     }
 
                 case "texldl":
-                {
-                        ResourceData rscData = origins[1] as ResourceData;
-                        Sampler sampler = rscData.resource as Sampler;
-                        instruction = new Instructions.SampleTextureLod(sampler.samplerType, modifiers);
+                    {
+                        instruction = new Instructions.SampleTextureLod(modifiers);
                         break;
                     }
 
@@ -1976,26 +1999,26 @@
                     {
                         instruction = new Instructions.Normalize(modifiers);
                         break;
-                }
+                    }
 
                 case "dsx":
                 case "dsy":
-                {
-                    instruction = new Instructions.DirectionDifference(instructionStr.EndsWith("x"), modifiers);
-                    break;
-                }
+                    {
+                        instruction = new Instructions.DirectionDifference(instructionStr.EndsWith("x"), modifiers);
+                        break;
+                    }
 
                 case "sge":
-                {
-                    instruction = new Instructions.Sge(modifiers);
-                    break;
-                }
+                    {
+                        instruction = new Instructions.Sge(modifiers);
+                        break;
+                    }
 
                 case "slt":
-                {
-                    instruction = new Instructions.Slt(modifiers);
-                    break;
-                }
+                    {
+                        instruction = new Instructions.Slt(modifiers);
+                        break;
+                    }
 
                 case "abs":
                     {
@@ -2022,18 +2045,7 @@
                     break;
             }
 
-            Statement statement;
-
-            if (instruction == null)
-            {
-                statement = new Comment(index, $"L{index}: {instructionStr} {lineContents}");
-            }
-            else
-            {
-                statement = new Statement(index, instruction, destination, origins);
-            }
-
-            statements.Add(statement);
+            return instruction;
         }
     }
 }

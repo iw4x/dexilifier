@@ -10,17 +10,19 @@
     {
         public class SampleTexture : Instruction
         {
-            public override int[] InputsMaximumWidth => new int[] { GetTexCoordWidth(), int.MaxValue };
+            public override int[] GetInputsMaximumWidth(IReadOnlyList<CodeData> inputs)
+            {
+                return new int[] { GetTexCoordWidth(inputs), int.MaxValue };
+            }
 
             public override bool OutputInputAreSameSize => false;
 
+            public override bool DestinationMaskDictatesInputWidth => false;
+
             public override int OutputMaximumWidth => 4;
 
-            private readonly Sampler.SamplerType samplerType;
-
-            public SampleTexture(Sampler.SamplerType type, InstructionModifiers modifiers) : base(modifiers)
+            public SampleTexture(InstructionModifiers modifiers) : base(modifiers)
             {
-                this.samplerType = type;
             }
 
             public override bool Simplify(CodeData destination, CodeData[] arguments)
@@ -32,16 +34,45 @@
             protected virtual string GetSuffix() => string.Empty;
 
 
-            protected virtual int GetTexCoordWidth() => this.samplerType == Sampler.SamplerType.sampler2D ? 2 : 3;
+            protected virtual int GetTexCoordWidth(IReadOnlyList<CodeData> arguments)
+            {
+                System.Diagnostics.Debug.Assert(arguments.Count == 2);
+
+                ResourceData rscData = arguments[1] as ResourceData;
+                System.Diagnostics.Debug.Assert(rscData != null);
+
+                Sampler sampler = rscData.resource as Sampler;
+                System.Diagnostics.Debug.Assert(sampler != null);
+
+                Sampler.SamplerType samplerType = sampler.samplerType;
+
+                return samplerType == Sampler.SamplerType.sampler2D? 2 : 3;
+            }
+
+            protected override string FormatCallInternal(CodeData destination, IReadOnlyList<CodeData> arguments)
+            {
+                string[] strArguments = new string[arguments.Count];
+
+                for (int argumentIndex = 0; argumentIndex < arguments.Count; argumentIndex++)
+                {
+                    CodeData argument = arguments[argumentIndex];
+                    strArguments[argumentIndex] = argument.GetDecompiledName();
+                }
+
+                return string.Format("tex" + GetDimensionIndicator(arguments[1]) + GetSuffix() + "({1}, {0})", strArguments);
+            }
 
             protected override string FormatCallInternal(params string[] arguments)
             {
-                // SWAPPED !!
-                return string.Format("tex" + GetDimensionIndicator () + GetSuffix() + "({1}, {0})", arguments);
+                throw new NotImplementedException();
             }
 
-            private string GetDimensionIndicator()
+            private string GetDimensionIndicator(CodeData codeData)
             {
+                ResourceData rscData = codeData as ResourceData;
+                Sampler sampler = rscData.resource as Sampler;
+                Sampler.SamplerType samplerType = sampler.samplerType;
+
                 switch (samplerType)
                 {
                     case Sampler.SamplerType.sampler2D:
@@ -60,7 +91,7 @@
 
         public class SampleTextureLod : SampleTexture
         {
-            public SampleTextureLod(Sampler.SamplerType type, InstructionModifiers modifiers) : base(type, modifiers)
+            public SampleTextureLod(InstructionModifiers modifiers) : base(modifiers)
             {
             }
 
@@ -69,7 +100,7 @@
                 return "lod";
             }
 
-            protected override int GetTexCoordWidth()
+            protected override int GetTexCoordWidth(IReadOnlyList<CodeData> inputs)
             {
                 return 4;
             }
@@ -77,7 +108,7 @@
 
         public class SampleTextureBias : SampleTexture
         {
-            public SampleTextureBias(Sampler.SamplerType type, InstructionModifiers modifiers) : base(type, modifiers)
+            public SampleTextureBias(InstructionModifiers modifiers) : base(modifiers)
             {
             }
 
@@ -86,7 +117,7 @@
                 return "bias";
             }
 
-            protected override int GetTexCoordWidth()
+            protected override int GetTexCoordWidth(IReadOnlyList<CodeData> inputs)
             {
                 return 4;
             }
@@ -95,7 +126,7 @@
 
         public class SampleTextureProjected : SampleTexture
         {
-            public SampleTextureProjected(Sampler.SamplerType type, InstructionModifiers modifiers) : base(type, modifiers)
+            public SampleTextureProjected(InstructionModifiers modifiers) : base(modifiers)
             {
             }
 
@@ -104,7 +135,7 @@
                 return "proj";
             }
 
-            protected override int GetTexCoordWidth()
+            protected override int GetTexCoordWidth(IReadOnlyList<CodeData> inputs)
             {
                 return 4;
             }
@@ -112,9 +143,10 @@
 
         public class Move : Instruction
         {
-            public override int[] InputsMaximumWidth => new int[] { 4 };
-
-            public override bool OutputInputAreSameSize => true;
+            public override int[] GetInputsMaximumWidth(IReadOnlyList<CodeData> inputs)
+            {
+                return new int[] { 4 };
+            }
 
             public Move(InstructionModifiers modifiers) : base(modifiers)
             {
@@ -130,9 +162,15 @@
         public class DotProduct : Instruction
         {
             // DP4 actually means that "at least one" of the entries has that width, not both
-            public override int[] InputsMaximumWidth => new int[] { knownWidth.Value, knownWidth.Value, 1 };
+            public override int[] GetInputsMaximumWidth(IReadOnlyList<CodeData> inputs)
+            {
+                return new int[] { knownWidth.Value, knownWidth.Value, 1 };
+            }
 
             public override int OutputMaximumWidth => 1;
+
+            public override bool OutputInputAreSameSize => false;
+
 
             public DotProduct(byte width, InstructionModifiers modifiers) : base(width, modifiers)
             {
@@ -156,9 +194,11 @@
 
         public class Multiply : Instruction
         {
-            public override int[] InputsMaximumWidth => new int[] {4, 4, 4 };
+            public override int[] GetInputsMaximumWidth(IReadOnlyList<CodeData> inputs)
+            {
+                return new int[] { 4, 4, 4 };
+            }
 
-            public override bool OutputInputAreSameSize => true;
 
             public Multiply(InstructionModifiers modifiers) : base(modifiers)
             {
@@ -221,7 +261,10 @@
 
         public class Pow : Instruction
         {
-            public override int[] InputsMaximumWidth => new int[] { 4, 4 };
+            public override int[] GetInputsMaximumWidth(IReadOnlyList<CodeData> inputs)
+            {
+                return new int[] { 4, 4 };
+            }
 
             public override bool OutputInputAreSameSize => true;
 
@@ -239,9 +282,11 @@
 
         public class DirectionDifference : Instruction
         {
-            public override int[] InputsMaximumWidth => new int[] { 4 };
+            public override int[] GetInputsMaximumWidth(IReadOnlyList<CodeData> inputs)
+            {
+                return new int[] { 4 };
+            }
 
-            public override bool OutputInputAreSameSize => true;
 
             private readonly bool isX;
 
@@ -260,9 +305,10 @@
 
         public class Sge : Instruction
         {
-            public override int[] InputsMaximumWidth => new int[] { 4, 4 };
-
-            public override bool OutputInputAreSameSize => true;
+            public override int[] GetInputsMaximumWidth(IReadOnlyList<CodeData> inputs)
+            {
+                return new int[] { 4, 4 };
+            }
 
             public Sge(InstructionModifiers modifiers) : base(modifiers)
             {
@@ -278,9 +324,10 @@
 
         public class Slt : Instruction
         {
-            public override int[] InputsMaximumWidth => new int[] { 4, 4 };
-
-            public override bool OutputInputAreSameSize => true;
+            public override int[] GetInputsMaximumWidth(IReadOnlyList<CodeData> inputs)
+            {
+                return new int[] { 4, 4 };
+            }
 
             public Slt(InstructionModifiers modifiers) : base(modifiers)
             {
@@ -296,9 +343,10 @@
 
         public class Abs : Instruction
         {
-            public override int[] InputsMaximumWidth => new int[] { 4 };
-
-            public override bool OutputInputAreSameSize => true;
+            public override int[] GetInputsMaximumWidth(IReadOnlyList<CodeData> inputs)
+            {
+                return new int[] { 4 };
+            }
 
             public Abs(InstructionModifiers modifiers) : base(modifiers)
             {
@@ -312,9 +360,10 @@
 
         public class Normalize : Instruction
         {
-            public override int[] InputsMaximumWidth => new int[] { 4 };
-
-            public override bool OutputInputAreSameSize => true;
+            public override int[] GetInputsMaximumWidth(IReadOnlyList<CodeData> inputs)
+            {
+                return new int[] { 4 };
+            }
 
             public Normalize(InstructionModifiers modifiers) : base(modifiers)
             {
@@ -330,9 +379,10 @@
 
         public class Log : Instruction
         {
-            public override int[] InputsMaximumWidth => new int[] { 4 };
-
-            public override bool OutputInputAreSameSize => true;
+            public override int[] GetInputsMaximumWidth(IReadOnlyList<CodeData> inputs)
+            {
+                return new int[] { 4 };
+            }
 
             public Log(InstructionModifiers modifiers) : base(modifiers)
             {
@@ -348,9 +398,10 @@
 
         public class Compare : Instruction
         {
-            public override int[] InputsMaximumWidth => new int[] { 4, 4, 4 };
-
-            public override bool OutputInputAreSameSize => true;
+            public override int[] GetInputsMaximumWidth(IReadOnlyList<CodeData> inputs)
+            {
+                return new int[] { 4, 4, 4 };
+            }
 
             public Compare(InstructionModifiers modifiers) : base(modifiers)
             {
@@ -368,9 +419,11 @@
 
         public class Lerp : Instruction
         {
-            public override int[] InputsMaximumWidth => new int[] { 4, 4, 4 };
+            public override int[] GetInputsMaximumWidth(IReadOnlyList<CodeData> inputs)
+            {
+                return new int[] { 4, 4, 4 };
+            }
 
-            public override bool OutputInputAreSameSize => true;
 
             public Lerp(InstructionModifiers modifiers) : base(modifiers)
             {
@@ -387,10 +440,10 @@
 
         public class Exponential : Instruction
         {
-            public override int[] InputsMaximumWidth => new int[] { 4 };
-
-            public override bool OutputInputAreSameSize => true;
-
+            public override int[] GetInputsMaximumWidth(IReadOnlyList<CodeData> inputs)
+            {
+                return new int[] { 4 };
+            }
             public Exponential(InstructionModifiers modifiers) : base(modifiers)
             {
             }
@@ -406,9 +459,12 @@
 
         public class Reciprocal : Instruction
         {
-            public override int[] InputsMaximumWidth => new int[] { 4 };
+            public override bool DestinationMaskDictatesInputWidth => false;
 
-            public override bool OutputInputAreSameSize => true;
+            public override int[] GetInputsMaximumWidth(IReadOnlyList<CodeData> inputs)
+            {
+                return new int[] { 1 };
+            }
 
             public Reciprocal(InstructionModifiers modifiers) : base(modifiers)
             {
@@ -424,9 +480,12 @@
 
         public class SquareRoot : Instruction
         {
-            public override int[] InputsMaximumWidth => new int[] { 4 };
+            public override int[] GetInputsMaximumWidth(IReadOnlyList<CodeData> inputs)
+            {
+                return new int[] { 1 };
+            }
 
-            public override bool OutputInputAreSameSize => true;
+            public override bool DestinationMaskDictatesInputWidth => false;
 
             public SquareRoot(InstructionModifiers modifiers) : base(modifiers)
             {
@@ -442,9 +501,12 @@
 
         public class ReciprocalSquareRoot : Instruction
         {
-            public override int[] InputsMaximumWidth => new int[] { 4 };
+            public override bool DestinationMaskDictatesInputWidth => false;
 
-            public override bool OutputInputAreSameSize => true;
+            public override int[] GetInputsMaximumWidth(IReadOnlyList<CodeData> inputs)
+            {
+                return new int[] { 1 };
+            }
 
             public ReciprocalSquareRoot(InstructionModifiers modifiers) : base(modifiers)
             {
@@ -460,7 +522,10 @@
 
         public class Length : Instruction
         {
-            public override int[] InputsMaximumWidth => new int[] { 4 };
+            public override int[] GetInputsMaximumWidth(IReadOnlyList<CodeData> inputs)
+            {
+                return new int[] { 4 };
+            }
 
             public override int OutputMaximumWidth => 1;
 
@@ -480,7 +545,10 @@
 
         public class SinCos : Instruction
         {
-            public override int[] InputsMaximumWidth => new int[] { 1 };
+            public override int[] GetInputsMaximumWidth(IReadOnlyList<CodeData> inputs)
+            {
+                return new int[] { 1 };
+            }
 
             public override int OutputMaximumWidth => 2;
 
@@ -520,9 +588,10 @@
 
         public class Add : Instruction
         {
-            public override int[] InputsMaximumWidth => new int[] { 4, 4};
-
-            public override bool OutputInputAreSameSize => true;
+            public override int[] GetInputsMaximumWidth(IReadOnlyList<CodeData> inputs)
+            {
+                return new int[] { 4, 4 };
+            }
 
             public Add(InstructionModifiers modifiers) : base(modifiers)
             {
@@ -567,9 +636,10 @@
 
         public class Frac : Instruction
         {
-            public override int[] InputsMaximumWidth => new int[] { 4 };
-
-            public override bool OutputInputAreSameSize => true;
+            public override int[] GetInputsMaximumWidth(IReadOnlyList<CodeData> inputs)
+            {
+                return new int[] { 4 };
+            }
 
             public Frac(InstructionModifiers modifiers) : base(modifiers)
             {
@@ -585,7 +655,10 @@
 
         public class Max : Instruction
         {
-            public override int[] InputsMaximumWidth => new int[] { 4, 4 };
+            public override int[] GetInputsMaximumWidth(IReadOnlyList<CodeData> inputs)
+            {
+                return new int[] { 4, 4 };
+            }
 
             public override bool OutputInputAreSameSize => true;
 
@@ -604,9 +677,10 @@
 
         public class Min : Instruction
         {
-            public override int[] InputsMaximumWidth => new int[] { 4, 4 };
-
-            public override bool OutputInputAreSameSize => true;
+            public override int[] GetInputsMaximumWidth(IReadOnlyList<CodeData> inputs)
+            {
+                return new int[] { 4, 4 };
+            }
 
             public Min(InstructionModifiers modifiers) : base(modifiers)
             {
@@ -624,9 +698,10 @@
 
         public class MultiplyAdd : Instruction
         {
-            public override int[] InputsMaximumWidth => new int[] { 4, 4, 4 };
-
-            public override bool OutputInputAreSameSize => true;
+            public override int[] GetInputsMaximumWidth(IReadOnlyList<CodeData> inputs)
+            {
+                return new int[] { 4, 4, 4 };
+            }
 
             public MultiplyAdd(InstructionModifiers modifiers) : base(modifiers)
             {

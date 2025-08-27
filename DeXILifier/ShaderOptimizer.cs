@@ -97,7 +97,12 @@
             public class MxMultiply : Instruction
             {
                 public override bool OutputInputAreSameSize => false;
-                public override int[] InputsMaximumWidth => new int[] { columns, rows * columns };
+
+
+                public override int[] GetInputsMaximumWidth(IReadOnlyList<CodeData> arguments)
+                {
+                    return new int[] { columns, rows * columns };
+                }
 
                 public byte IndividualChannelWidth => rows;
 
@@ -187,7 +192,7 @@
                     sourceChannels[i] = 
                         statements[i] == null ?
                         (i == 0 ? i : sourceChannels[i-1]) : // Compiler does not care whether this is invalid or not, so it's fine. Repeating the previous swizzle gets us around
-                        Front.Arguments[0].UsedChannels[i];
+                        statements[i].Arguments[0].UsedChannels[i];
                 }
 
                 CodeData destination = @base.Destination;
@@ -273,15 +278,22 @@
                                 return false;
                             }
 
-                            if (!equals(statements[i].Arguments[argumentIndex].UsedChannels, statement.Arguments[argumentIndex].UsedChannels))
-                            {
-                                return false;
-                            }
-
                             if (statements[i].Arguments[argumentIndex] is ResourceData baseData && baseData.resource is MatrixChannelAccessResource wideBase &&
                                 statement.Arguments[argumentIndex] is ResourceData comparisonData && comparisonData.resource is MatrixChannelAccessResource wideComparison)
                             {
                                 if (wideComparison.index == wideBase.index)
+                                {
+                                    return false;
+                                }
+                            }
+                            else
+                            {
+                                // They both write to the same destination channel, which is weird
+
+                                if (!equals(
+                                    statements[i].Arguments[argumentIndex].UsedChannels,
+                                    statement.Arguments[argumentIndex].UsedChannels)
+                                )
                                 {
                                     return false;
                                 }

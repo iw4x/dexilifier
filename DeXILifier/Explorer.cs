@@ -80,6 +80,20 @@
             treeViewTab = mainWindow.explorerTab;
             compiledShaderTab = mainWindow.compiledShaderTab;
             tabView = mainWindow.tabView;
+
+            tabView.SelectedIndexChanged += TabView_TabIndexChanged;
+        }
+
+        private void TabView_TabIndexChanged(object sender, EventArgs e)
+        {
+            if (tabView.SelectedTab == treeViewTab)
+            {
+                if (treeView.SelectedNode is TreeNode node)
+                {
+                    treeView.Focus();
+                    //= node;
+                }
+            }
         }
 
         public void Initialize()
@@ -163,14 +177,14 @@
             singleFileMode = false;
             treeViewTab.Enabled = true;
 
+            treeView.Parent.SuspendLayout();
             treeView.Enabled = false;
             treeView.Nodes.Clear();
             filenameForNode.Clear();
-            treeView.SuspendLayout();
 
             ExploreFolderForShaders(folder);
 
-            treeView.ResumeLayout();
+            treeView.Parent.ResumeLayout(true);
             treeView.Enabled = true;
             tabView.SelectTab(treeViewTab);
         }
@@ -183,7 +197,7 @@
 
             treeView.Enabled = false;
             filenameForNode.Clear();
-            treeView.SuspendLayout();
+            treeView.Parent.SuspendLayout();
 
             if (Path.GetDirectoryName(filePath).EndsWith("techniques"))
             {
@@ -194,7 +208,7 @@
                 ExploreTechniqueSet(filePath);
             }
 
-            treeView.ResumeLayout();
+            treeView.Parent.ResumeLayout(true);
             treeView.Enabled = true;
             tabView.SelectTab(treeViewTab);
         }

@@ -12,11 +12,16 @@
 
         public readonly InstructionModifiers modifiers;
 
-        public virtual int[] InputsMaximumWidth => new int[0];
+        public virtual int[] GetInputsMaximumWidth(IReadOnlyList<CodeData> inputs)
+        {
+            return new int[0];
+        }
 
         public virtual int OutputMaximumWidth => 4;
 
-        public virtual bool OutputInputAreSameSize => false;
+        public virtual bool OutputInputAreSameSize => true;
+
+        public virtual bool DestinationMaskDictatesInputWidth => OutputInputAreSameSize;
 
         protected Instruction(byte width, InstructionModifiers modifiers) : this(modifiers)
         {
@@ -38,16 +43,17 @@
                 modified |= true;
             }
 
-            if (InputsMaximumWidth.Length < arguments.Length)
+            if (GetInputsMaximumWidth(arguments).Length < arguments.Length)
             {
                 throw new Exception($"Misconfiguration on {GetType()}");
             }
 
             for (int i = 0; i < arguments.Length; i++)
             {
-                if (arguments[i].UsedChannels.Length > InputsMaximumWidth[i])
+                int maxWidth = GetInputsMaximumWidth(arguments)[i];
+                if (arguments[i].UsedChannels.Length > maxWidth)
                 {
-                    arguments[i].Shrink(InputsMaximumWidth[i]);
+                    arguments[i].Shrink(maxWidth);
                     modified |= true;
                 }
             }
