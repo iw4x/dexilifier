@@ -27,28 +27,10 @@ half4 PSMain(VSOutput inputVx) : SV_Target
 	
 float4 var_outrA;
 var_outrA.rgb = normalize(inputVx.texcoord5);
-	var_outrA.rgb = lightPosition.xyz + inputVx.texcoord5;
 	
 float4 var_outr;
-var_outr.xyz = normalize(inputVx.texcoord1.xyz);
-	
-half var_B = max(abs(var_outr.y), abs(var_outr.z));
-	
-half var_C = max(abs(var_outr.x), var_B);
-	var_outr.w = 1 / var_C;
-	
-half3 var_D = var_outr.xyz * lightingLookupScale.xyz;
-	
-half3 var_E = var_D * var_outr.w + inputVx.texcoord6;
-	var_outr.w = dot(var_outrA.rgb, var_outrA.rgb);
-	var_outr.w = rsqrt(var_outr.w);
-	var_outrA.a = 1 / var_outr.w;
-	var_outrA.rgb = var_outrA.rgb * var_outr.w;
-	var_outr.w = saturate(var_outrA.a * lightPosition.w);
-	
-half4 var_attenuation = tex2D(attenuationSampler, var_outr.w);
-	var_outr.w = dot(fogSunDir.xyz, var_outrA.rgb);
-	var_outr.w = var_outr.w + fogSunConsts.y;
+var_outr.w = dot(fogSunDir.xyz, var_outrA.rgb);
+	var_outr.w = var_outr.w + (-fogSunConsts.y);
 	var_outr.w = saturate(var_outr.w * fogSunConsts.z);
 	var_outrA.rgb = fogColorLinear.xyz;
 	var_outrA.rgb += fogSunColorLinear.xyz;
@@ -57,16 +39,34 @@ half4 var_attenuation = tex2D(attenuationSampler, var_outr.w);
 half4 var_colormap = tex2D(colorMapSampler, inputVx.texcoord);
 	var_colormap.rgb *= inputVx.color;
 	var_colormap.rgb = var_colormap.rgb * var_colormap.rgb;
+	var_outr.xyz = normalize(inputVx.texcoord1.xyz);
+	
+half var_B = max(abs(var_outr.y), abs(var_outr.z));
+	
+half var_C = max(abs(var_outr.x), var_B);
+	var_outrA.rgb = lightPosition.xyz + (-inputVx.texcoord5);
+	var_outr.w = dot(var_outrA.rgb, var_outrA.rgb);
+	var_outr.w = rsqrt(var_outr.w);
+	var_outrA.rgb = var_outrA.rgb * var_outr.www;
+	
+half3 var_D = var_outr.xyz * lightingLookupScale.xyz;
 	var_outr.x = saturate(dot(var_outrA.rgb, var_outr.xyz));
 	var_outr.xyz *= lightDiffuse.xyz;
+	var_outrA.a = 1 / var_outr.w;
+	var_outr.w = saturate(var_outrA.a * lightPosition.w);
+	
+half4 var_attenuation = tex2D(attenuationSampler, var_outr.ww);
 	var_attenuation.xyz = var_attenuation.xyz * var_attenuation.xyz;
+	var_outr.w = 1 / var_C;
+	
+half3 var_E = var_D * var_outr.w + inputVx.texcoord6;
 	
 half4 var_modellighting = tex3D(modelLightingSampler, var_E);
-	var_attenuation.xyz = var_modellighting.w * var_attenuation.xyz;
+	var_attenuation.xyz = var_modellighting.www * var_attenuation.xyz;
 	var_modellighting.xyz = var_modellighting.xyz + var_modellighting.xyz;
 	var_modellighting.xyz = var_modellighting.xyz * var_modellighting.xyz;
 	var_outr.xyz = var_attenuation.xyz * var_outr.xyz + var_modellighting.xyz;
-	var_outr.xyz = var_colormap.rgb * var_outr.xyz + -var_outrA.rgb;
+	var_outr.xyz = var_colormap.rgb * var_outr.xyz + (-var_outrA.rgb);
 
 	outColor.xyz = inputVx.texcoord1.w * var_outr.xyz + var_outrA.rgb;
 	outColor.w = 1;

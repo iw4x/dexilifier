@@ -18,6 +18,8 @@
     {
         public string InputText { set { inputTextBox.Text = value; } }
 
+        public OptimizationParameters CurrentParameters => currentParameters;
+
         private int taskToken = 0;
 
         private readonly Color defaultBack;
@@ -335,6 +337,7 @@
                                     BuildDecompiledRepresentation(output);
 
                                     decompilationProgressBar.Value = 100;
+                                    decompilationProgressBar.Hide();
 
                                     toolOutputTabs.SelectTab(shaderTab);
                                 }));
@@ -347,6 +350,7 @@
                                     decompilationResultTextBox.ForeColor = Color.White;
                                     decompilationResultTextBox.Text = except.ToString();
                                     decompilationProgressBar.Value = 0;
+                                    decompilationProgressBar.Hide();
                                     InputText = output.rawOriginalText;
 
                                     toolOutputTabs.SelectTab(shaderTab);
@@ -360,6 +364,7 @@
                         {
                             void updateProgress()
                             {
+                                decompilationProgressBar.Show();
                                 decompilationProgressBar.Value = (int)p * 100;
                             }
 

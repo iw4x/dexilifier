@@ -23,6 +23,16 @@
         public TechniqueSetView()
         {
             InitializeComponent();
+
+            mappingTable.SuspendLayout();
+
+            mappingTable.RowCount = 0;
+            mappingTable.RowStyles.Clear();
+            mappingTable.Controls.Clear();
+
+            mappingTable.ResumeLayout(true);
+
+            Enabled = false;
         }
 
         internal void LoadTechniqueSet(string basePath, Explorer.TechniqueSetTreeNode techSetNode)
@@ -45,7 +55,9 @@
 
             //AnalyzeTechniqueSetShaders(techSetNode);
 
-            mappingTable.ResumeLayout();
+            mappingTable.ResumeLayout(true);
+
+            Enabled = true;
         }
 
         private void AddTechniqueTreeNodeToList(Explorer.TechniqueTreeNode techNode)
@@ -79,13 +91,14 @@
                     techniqueLabel.Margin = new Padding(0);
                     techniqueLabel.Padding = new Padding(3);
 
-                    mappingTable.RowCount++;
-                    mappingTable.RowStyles.Add(new RowStyle(SizeType.Absolute, 24));
                     mappingTable.Controls.Add(techniqueLabel);
 
                     mappingTable.SetRowSpan(techniqueLabel, techNode.usedInTypes.Count);
                 }
             }
+
+            mappingTable.RowCount++;
+            mappingTable.RowStyles.Add(new RowStyle(SizeType.Absolute, 24));
         }
    
         private void AnalyzeTechniqueSetShaders(Explorer.TechniqueSetTreeNode techSetNode)
@@ -116,16 +129,23 @@
             Task[] tasks = new Task[total];
             float[] progresses = new float[total];
 
+            FolderBrowserDialog dialog = new FolderBrowserDialog();
+            dialog.SelectedPath = basePath;
+
+            if (dialog.ShowDialog() != DialogResult.OK)
+            {
+                return;
+            }
+
+            string exportPath = dialog.SelectedPath;
+            if (!Directory.Exists(exportPath))
+            {
+                Directory.CreateDirectory(exportPath);
+            }
 
             var dial = ProgressBarDialog.ShowProgressDialog(ParentForm, () => progresses.Sum());
-
-            OptimizationParameters parameters = new OptimizationParameters()
-            {
-                inlineConstants = true,
-                reduceInstructions = true,
-                renameVariablesBasedOnUsage = true,
-                reorganize = true
-            };
+            
+            OptimizationParameters parameters = (ParentForm as MainWindow).CurrentParameters;
 
             int shaderIndex = 0;
             foreach(var px in allPixelShaders)
@@ -137,7 +157,8 @@
                     DecompiledShader? shader = await ShaderWork.RecreateShaderTask(path, parameters, (p)=> progresses[myIndex] = p);
                     if (shader.HasValue)
                     {
-                        using(FileStream fs = File.OpenWrite(Path.Combine(basePath, "ps", px)))
+                        Directory.CreateDirectory(Path.Combine(exportPath, "ps"));
+                        using(FileStream fs = File.OpenWrite(Path.Combine(exportPath, "ps", px)))
                         {
                             shader.Value.Export(fs);
                         }
@@ -156,7 +177,8 @@
                     DecompiledShader? shader = await ShaderWork.RecreateShaderTask(path, parameters, (p) => progresses[myIndex] = p);
                     if (shader.HasValue)
                     {
-                        using (FileStream fs = File.OpenWrite(Path.Combine(basePath, "vs", vx)))
+                        Directory.CreateDirectory(Path.Combine(exportPath, "vs"));
+                        using (FileStream fs = File.OpenWrite(Path.Combine(exportPath, "vs", vx)))
                         {
                             shader.Value.Export(fs);
                         }
@@ -171,7 +193,7 @@
             {
                 Task.WaitAll(tasks);
                 dial.HideProgressDialog();
-                Process.Start("explorer.exe", basePath);
+                Process.Start("explorer.exe", exportPath);
             });
         }
     }

@@ -27,26 +27,29 @@ half4 var_colormap = tex2D(colorMapSampler, inputVx.texcoord);
 float4 var_outr;
 var_outr.rgb = normalize(inputVx.texcoord1.xyz);
 	
-half3 var_D = var_outr.rgb * lightingLookupScale.xyz;
-	var_outr.r = saturate(dot(lightPosition.xyz, var_outr.rgb));
-	
 half var_B = max(abs(var_outr.g), abs(var_outr.b));
 	
 half var_C = max(abs(var_outr.r), var_B);
+	
+half3 var_D = var_outr.rgb * lightingLookupScale.xyz;
+	var_outr.r = saturate(dot(lightPosition.xyz, var_outr.rgb));
 	var_outr.a = 1 / var_C;
-	var_outr.gba = var_D.xxy * var_outr.a + inputVx.texcoord6.xxy;
+	var_outr.gba = var_D * var_outr.a + inputVx.texcoord6;
 	
 half4 var_modellighting = tex3D(modelLightingSampler, var_outr.gba);
-	var_outr.gba = var_modellighting.xxy + var_modellighting.xxy;
-	var_modellighting.xyz = var_outr.r * lightDiffuse.xyz;
-	var_outr.gba = var_outr.rgb * var_outr.rgb;
+	var_outr.gba = var_modellighting.xyz + var_modellighting.xyz;
+	var_modellighting.xyz = var_outr.rrr * lightDiffuse.xyz;
+	var_outr.gba = var_outr.gba * var_outr.gba;
 	var_outr.rgb = var_modellighting.w * var_modellighting.xyz + var_outr.gba;
-	var_outr.rgb = var_colormap.rgb * var_outr.rgb + fogColorLinear.xyz;
+	var_outr.rgb = var_colormap.rgb * var_outr.rgb - fogColorLinear.xyz;
 
 	outColor.xyz = inputVx.texcoord1.w * var_outr.rgb + fogColorLinear.xyz;
 	outColor.w = 1;
 
 	return outColor;
 }
+
+
+
 
 

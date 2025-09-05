@@ -30,43 +30,49 @@ VSOutput VSMain(VSInput vin)
 	
 float4 var_tex2 = float4(vin.position.x, vin.position.y, vin.position.z, 1);
 	
-float4 var_A = (1 / float4(1024, 1024, 32768, 32768)) * vin.texcoord.zxzx;
-	
-float4 var_B = vin.texcoord.wywy * float4(0.25, 0.25, 0.0078125, 0.0078125) + var_A;
-	
-float4 var_texdA = frac(var_B);
-	var_B.zw = var_B.xy + -var_texdA.xy;
-	var_B.xy = var_texdA.xy * 0.03125 + var_texdA.zw;
-	
-float4 var_texd = var_B * float4(32, 32, -2, -2) + float4(-15, -15, 1, 1);
-	var_texd.zw = var_texd.xy * var_texdA.xy + var_texd.xy;
-	var_texdA.xy = exp(var_texd.xy);
+float4 var_posn = mul(var_tex2, worldMatrix);
 
-	vout.texcoord = var_texd.zw * var_texdA.xy;
-
-	var_texdA = mul(var_tex2, worldMatrix);
-
-	vout.position = mul(var_texdA, viewProjectionMatrix);
+	vout.position = mul(var_posn, viewProjectionMatrix);
 
 	
-float4 var_tex3 = vin.normal / float4(127, 127, 127, 255) - float4(1, 1, 1, -1.328125);
-	var_tex2.yzw = var_tex3.w * var_tex3.xxy;
-	var_tex3.z = dot(var_tex2.yzw, worldMatrix[2].xyz);
-	
-float4 var_tex1 = vin.texcoord1 / float4(127, 127, 127, 255) - float4(1, 1, 1, -1.328125);
-	var_tex2.yzw = var_tex1.w * var_tex1.xxy;
-	var_tex1.x = dot(var_tex2.yzw, worldMatrix[0].xyz);
-	var_tex1.y = dot(var_tex2.yzw, worldMatrix[1].xyz);
-	var_tex1.z = dot(var_tex2.yzw, worldMatrix[2].xyz);
+float4 var_tex1 = vin.texcoord1 / float4(127, 127, 127, 255) + (1 / float4(-1, -1, -1, 1.328125));
+	var_tex2.yzw = var_tex1.www * var_tex1.xyz;
+	var_tex1.xyz = mul(var_tex2.yzw, (float3x3)worldMatrix);
 
 	vout.texcoord1 = var_tex1.xyz;
 
-	var_tex3.x = dot(var_tex2.yzw, worldMatrix[0].xyz);
-	var_tex3.y = dot(var_tex2.yzw, worldMatrix[1].xyz);
+	
+float4 var_tex3 = vin.normal / float4(127, 127, 127, 255) + (1 / float4(-1, -1, -1, 1.328125));
+	var_tex2.yzw = var_tex3.www * var_tex3.xyz;
+	var_tex3.xyz = mul(var_tex2.yzw, (float3x3)worldMatrix);
 
 	vout.texcoord3 = var_tex3.xyz;
 
+	
+float4 var_A = (1 / float4(1024, 1024, 32768, 32768)) * vin.texcoord.zxzx;
+	
+float4 var_B = vin.texcoord.wywy * float4(0.25, 0.25, 0.0078125, 0.0078125) + var_A;
+	var_posn = frac(var_B);
+	var_B.xy = var_posn.xy * (-0.03125) + var_posn.zw;
+	var_B.zw -= var_posn.zw;
+	
+float4 var_texd = var_B * float4(32, 32, -2, -2) + float4(-15, -15, 1, 1);
+	var_texd.zw = var_texd.zw * var_posn.xy + var_texd.zw;
+	var_posn.xy = exp(var_texd.xy);
+
+	vout.texcoord = var_texd.zw * var_posn.xy;
+
 	var_tex2.x = (1 / -1) + vin.texcoord2.w;
+	var_tex2.yzw = var_tex3.zxy * var_tex1.yzx;
+	var_tex2.yzw = var_tex3.yzx * var_tex1.zxy + (-var_tex2.yzw);
+
+	vout.texcoord2 = var_tex2.xxx * var_tex2.yzw;
+
+	return vout;
+}
+
+
+ vin.texcoord2.w;
 	var_tex2.yzw = var_tex3.xzx * var_tex1.xyz;
 	var_tex2.yzw = var_tex3.xyz * var_tex1.xzx + -var_tex2.xyz;
 

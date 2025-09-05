@@ -37,6 +37,7 @@
             this.listBox1 = new System.Windows.Forms.ListBox();
             this.groupBox2 = new System.Windows.Forms.GroupBox();
             this.exportAllFromTechsetButton = new System.Windows.Forms.Button();
+            this.diffLitShadersButton = new System.Windows.Forms.Button();
             this.mappingGroupBox.SuspendLayout();
             this.mappingTable.SuspendLayout();
             this.groupBox1.SuspendLayout();
@@ -45,8 +46,9 @@
             // 
             // mappingGroupBox
             // 
-            this.mappingGroupBox.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
-            | System.Windows.Forms.AnchorStyles.Left)));
+            this.mappingGroupBox.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
+            | System.Windows.Forms.AnchorStyles.Left) 
+            | System.Windows.Forms.AnchorStyles.Right)));
             this.mappingGroupBox.Controls.Add(this.mappingTable);
             this.mappingGroupBox.Location = new System.Drawing.Point(3, 3);
             this.mappingGroupBox.Name = "mappingGroupBox";
@@ -125,10 +127,12 @@
             // 
             // groupBox2
             // 
+            this.groupBox2.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
+            this.groupBox2.Controls.Add(this.diffLitShadersButton);
             this.groupBox2.Controls.Add(this.exportAllFromTechsetButton);
             this.groupBox2.Location = new System.Drawing.Point(565, 3);
             this.groupBox2.Name = "groupBox2";
-            this.groupBox2.Size = new System.Drawing.Size(229, 53);
+            this.groupBox2.Size = new System.Drawing.Size(229, 83);
             this.groupBox2.TabIndex = 2;
             this.groupBox2.TabStop = false;
             this.groupBox2.Text = "Actions";
@@ -142,6 +146,15 @@
             this.exportAllFromTechsetButton.Text = "Export all shaders";
             this.exportAllFromTechsetButton.UseVisualStyleBackColor = true;
             this.exportAllFromTechsetButton.Click += new System.EventHandler(this.exportAllFromTechsetButton_Click);
+            // 
+            // diffLitShadersButton
+            // 
+            this.diffLitShadersButton.Location = new System.Drawing.Point(6, 48);
+            this.diffLitShadersButton.Name = "diffLitShadersButton";
+            this.diffLitShadersButton.Size = new System.Drawing.Size(217, 23);
+            this.diffLitShadersButton.TabIndex = 1;
+            this.diffLitShadersButton.Text = "Compare lit shaders";
+            this.diffLitShadersButton.UseVisualStyleBackColor = true;
             // 
             // TechniqueSetView
             // 
@@ -171,5 +184,6 @@
         private System.Windows.Forms.ListBox listBox1;
         private System.Windows.Forms.GroupBox groupBox2;
         private System.Windows.Forms.Button exportAllFromTechsetButton;
+        private System.Windows.Forms.Button diffLitShadersButton;
     }
 }

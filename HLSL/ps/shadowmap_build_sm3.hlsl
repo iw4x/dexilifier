@@ -18,7 +18,7 @@ var_outr.x = ddx(inputVx.texcoord);
 	var_outr.x = abs(var_outr.x) + abs(var_outr.y);
 	var_outr.x = shadowmapPolygonOffset.y * var_outr.x + shadowmapPolygonOffset.x;
 
-	outColor = var_outr.x + inputVx.texcoord;
+	outColor = var_outr.xxxx + inputVx.texcoord.xxxx;
 
 	return outColor;
 }

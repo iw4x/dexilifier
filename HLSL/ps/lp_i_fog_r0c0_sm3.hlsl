@@ -36,7 +36,7 @@ var_D.w = 1 / var_C;
 half4 var_modellighting = tex3D(modelLightingSampler, var_D.xyz);
 	var_modellighting.rgb = var_modellighting.rgb + var_modellighting.rgb;
 	var_modellighting.rgb = var_modellighting.rgb * var_modellighting.rgb;
-	var_modellighting.rgb = var_colormap.rgb * var_modellighting.rgb + fogColorLinear.xyz;
+	var_modellighting.rgb = var_colormap.rgb * var_modellighting.rgb - fogColorLinear.xyz;
 
 	outColor.xyz = inputVx.texcoord1.w * var_modellighting.rgb + fogColorLinear.xyz;
 	outColor.w = 1;

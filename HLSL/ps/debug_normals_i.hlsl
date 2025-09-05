@@ -17,21 +17,21 @@ half4 PSMain(VSOutput inputVx) : SV_Target
 	half4 outColor;
 	
 float4 var_normalmap;
-var_normalmap.xyz = debugBumpmap.y * inputVx.texcoord2_pp;
+var_normalmap.xyz = debugBumpmap.yyy * inputVx.texcoord2_pp;
+	var_normalmap.xyz = inputVx.texcoord1_pp * debugBumpmap.x + var_normalmap.xyz;
+	var_normalmap.xyz = inputVx.texcoord3_pp * debugBumpmap.z + var_normalmap.xyz;
 	var_normalmap = tex2D(normalMapSampler, inputVx.texcoord);
-	var_normalmap.xy = var_normalmap.wy * float2(4.08, 4.064516) - float2(2.08, 2.064516);
+	var_normalmap.xy = var_normalmap.wy * float2(4.08, 4.064516) + float2(-2.08, -2.064516);
 	
 half3 var_B = inputVx.texcoord1_pp;
-	var_normalmap.xzw = var_normalmap.x * var_B.xyy + inputVx.texcoord3_pp.xyy;
+	var_normalmap.xzw = var_normalmap.x * var_B + inputVx.texcoord3_pp;
 	var_normalmap.xyz = var_normalmap.y * inputVx.texcoord2_pp + var_normalmap.xzw;
 	
 half3 var_C = normalize(var_normalmap.xyz);
-	var_normalmap.xyz = inputVx.texcoord1_pp * debugBumpmap.x + var_normalmap.xyz;
-	var_normalmap.xyz = inputVx.texcoord3_pp * debugBumpmap.z + var_normalmap.xyz;
 	var_normalmap.xyz = var_C * debugBumpmap.w + var_normalmap.xyz;
-	var_normalmap.xyz = var_normalmap.xyz + 1;
+	var_normalmap.xyz = var_normalmap.xyz + float3(1, 1, 1);
 
-	outColor.xyz = var_normalmap.xyz * 0.5;
+	outColor.xyz = var_normalmap.xyz * float3(0.5, 0.5, 0.5);
 	outColor.w = 1;
 
 	return outColor;

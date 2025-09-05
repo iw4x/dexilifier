@@ -22,10 +22,10 @@ half4 PSMain(VSOutput inputVx) : SV_Target
 	half4 outColor;
 	
 float4 var_outr;
-var_outr.rgb = lightPosition.xyz + inputVx.texcoord5;
+var_outr.rgb = lightPosition.xyz + (-inputVx.texcoord5);
 	var_outr.a = dot(var_outr.rgb, var_outr.rgb);
 	var_outr.a = rsqrt(var_outr.a);
-	var_outr.rgb = var_outr.rgb * var_outr.a;
+	var_outr.rgb = var_outr.rgb * var_outr.aaa;
 	
 half var_B = dot(var_outr.rgb, lightSpotDir.xyz);
 	
@@ -42,15 +42,15 @@ half var_C = saturate(var_B * lightSpotFactors.x + lightSpotFactors.y);
 half var_D = pow(abs(var_C), abs(lightSpotFactors.z));
 	
 half4 var_E;
-var_E.x = (-var_C >= 0 ? 0 : var_D);
+var_E.x = ((-var_C) >= 0 ? 0 : var_D);
 	var_outr.a = 1 / var_outr.a;
 	var_outr.a *= saturate(lightPosition.w);
 	
-half4 var_attenuation = tex2D(attenuationSampler, var_outr.a);
-	var_E.yzw = var_attenuation.xxy * var_attenuation.xxy;
-	var_E.xyz = var_E.x * var_E.yzw;
+half4 var_attenuation = tex2D(attenuationSampler, var_outr.aa);
+	var_E.yzw = var_attenuation.xyz * var_attenuation.xyz;
+	var_E.xyz = var_E.xxx * var_E.yzw;
 	var_E.xyz *= var_colormap.rgb;
-	var_outr.rgb = var_E.xyz * var_outr.rgb + fogColorLinear.xyz;
+	var_outr.rgb = var_E.xyz * var_outr.rgb - fogColorLinear.xyz;
 
 	outColor.xyz = inputVx.texcoord1.w * var_outr.rgb + fogColorLinear.xyz;
 	outColor.w = 1;

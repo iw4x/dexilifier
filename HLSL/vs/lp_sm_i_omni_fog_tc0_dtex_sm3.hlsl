@@ -35,42 +35,47 @@ VSOutput VSMain(VSInput vin)
 	
 float4 var_E = float4(vin.position.x, vin.position.y, vin.position.z, 1);
 	
+float4 var_tex4 = mul(var_E, worldMatrix);
+
+	vout.texcoord4 = mul(var_tex4, shadowLookupMatrix);
+	vout.position = mul(var_tex4, viewProjectionMatrix);
+	vout.texcoord5 = var_tex4.xyz;
+
+	
 float4 var_A = (1 / float4(1024, 1024, 32768, 32768)) * vin.texcoord.zxzx;
 	
 float4 var_B = vin.texcoord.wywy * float4(0.25, 0.25, 0.0078125, 0.0078125) + var_A;
-	
-float4 var_texdA = frac(var_B);
-	var_B.zw = var_B.xy + -var_texdA.xy;
-	var_B.xy = var_texdA.xy * 0.03125 + var_texdA.zw;
+	var_tex4 = frac(var_B);
+	var_B.xy = var_tex4.xy * (-0.03125) + var_tex4.zw;
+	var_B.zw -= var_tex4.zw;
 	
 float4 var_texd = var_B * float4(32, 32, -2, -2) + float4(-15, -15, 1, 1);
-	var_texd.zw = var_texd.xy * var_texdA.xy + var_texd.xy;
-	var_texdA.xy = exp(var_texd.xy);
+	var_texd.zw = var_texd.zw * var_tex4.xy + var_texd.zw;
+	var_tex4.xy = exp(var_texd.xy);
 
-	vout.texcoord = var_texd.zw * var_texdA.xy;
-
-	var_texdA = mul(var_E, worldMatrix);
-
-	vout.texcoord4 = mul(var_texdA, shadowLookupMatrix);
-	vout.position = mul(var_texdA, viewProjectionMatrix);
-	vout.texcoord5 = var_texdA.xyz;
+	vout.texcoord = var_texd.zw * var_tex4.xy;
 
 	
-float4 var_tex1 = vin.normal / float4(127, 127, 127, 255) - float4(1, 1, 1, -1.328125);
-	var_tex1.xyz = var_tex1.w * var_tex1.xyz;
+float4 var_tex1 = vin.normal / float4(127, 127, 127, 255) + (1 / float4(-1, -1, -1, 1.328125));
+	var_tex1.xyz = var_tex1.www * var_tex1.xyz;
 
-	vout.texcoord1.z = dot(var_tex1.xyz, worldMatrix[2].xyz);
+	vout.texcoord1.xyz = mul(var_tex1.xyz, (float3x3)worldMatrix);
 
-	var_tex1.x = dot(var_texdA.xyz, var_texdA.xyz);
-	var_tex1.x = rsqrt(var_tex1.x);
-	var_tex1.x = 1 / var_tex1.x;
+	var_tex1.x = length(var_tex4.xyz);
 	var_tex1.x = var_tex1.x * fogConsts.z + fogConsts.w;
 	var_tex1.x *= LOG2E;
 	var_tex1.x = exp(var_tex1.x);
 	var_tex1.x = max(var_tex1.x, fogConsts.y);
 
-	vout.texcoord1.w = min(var_tex1.x, (1 / -1));
-	vout.texcoord1.y = dot(var_tex1.xyz, worldMatrix[1].xyz);
+	vout.texcoord1.w = min(var_tex1.x, 1);
+	vout.color = vin.color;
+	vout.texcoord6 = (1 / float3(256, 256, 256)) * vin.texcoord3.xyz;
+
+	return vout;
+}
+
+
+ex1.xyz, worldMatrix[1].xyz);
 	vout.texcoord1.x = dot(var_tex1.xyz, worldMatrix[0].xyz);
 	vout.color = vin.color;
 	vout.texcoord6 = (1 / 256) * vin.texcoord3.xyz;

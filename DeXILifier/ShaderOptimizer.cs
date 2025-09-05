@@ -7,8 +7,6 @@
     using System.Linq;
     using System.Reflection;
     using static DX9ShaderHLSLifier.ShaderProgramObject;
-    using static ShaderProgramObject;
-
 
 
     public readonly struct ShaderOptimizer
@@ -27,20 +25,42 @@
                 for (int i = 0; i < requirements.Length; i++)
                 {
                     requirements[i].requiredBy.Add(this);
+
+                    // debug check
+                    for (int j = 0; j < requirements[i].statement.lines.Length; j++)
+                    {
+                        for (int myLineIndex = 0; myLineIndex < statement.lines.Length; myLineIndex++)
+                        {
+                            int requirementLine = requirements[i].statement.lines[j];
+                            int myLine = statement.lines[myLineIndex];
+
+                            if (requirementLine > myLine)
+                            {
+                                throw new Exception($"Terrible dependency work");
+                            }
+                        }
+                    }
                 }
             }
 
-            public bool Requires(DependencyLeaf otherLeaf)
+            public DependencyLeaf Find(Statement statement)
             {
-                for (int i = 0; i < requirements.Length; i++)
+                if (this.statement == statement)
                 {
-                    if (requirements[i] == otherLeaf || requirements[i].Requires(otherLeaf))
-                    {
-                        return true;
-                    }
+                    return this;
                 }
+                else
+                {
+                    for (int i = 0; i < requirements.Length; i++)
+                    {
+                        if (requirements[i].Find(statement) is DependencyLeaf result)
+                        {
+                            return result;
+                        }
+                    }
 
-                return true;
+                    return null;
+                }
             }
 
             public bool AreRequirementsMet(Predicate<Statement> present)
@@ -79,7 +99,7 @@
 
                     if (didAnything)
                     {
-                        return UnrollSatisfied(present, addStatement);
+                        return UnrollSatisfied(present, addStatement) || didAnything;
                     }
                 }
 
@@ -111,7 +131,7 @@
                 private readonly byte rows;
                 private readonly byte columns;
 
-                public MxMultiply(bool isHalfPrecision, byte rows, byte columns) : base(new InstructionModifiers() { isHalfPrecision = isHalfPrecision })
+                public MxMultiply(bool isHalfPrecision, byte rows, byte columns, byte knownWidth) : base(knownWidth, new InstructionModifiers() { isHalfPrecision = isHalfPrecision })
                 {
                     this.rows = rows;
                     this.columns = columns;
@@ -124,16 +144,13 @@
 
                 protected override string FormatCallInternal(params string[] arguments)
                 {
-                    string op = string.Format("mul({0}, {1})", arguments);
-
+                    string cast = string.Empty;
                     if (IndividualChannelWidth != OutputMaximumWidth)
                     {
-                        op += '.';
-                        for (byte i = 0; i < IndividualChannelWidth; i++)
-                        {
-                            op += i.VectorChannel();
-                        }
+                        cast = $"(float{IndividualChannelWidth}x{knownWidth})";
                     }
+
+                    string op = string.Format("mul({0}, {2}{1})", arguments[0], arguments[1], cast);
 
                     return op;
                 }
@@ -173,27 +190,27 @@
 
                 System.Diagnostics.Debug.Assert(matrix.rows >= width);
 
-                MxMultiply instruction = new MxMultiply(
-                    @base.Instruction.modifiers.isHalfPrecision,
-                    width,
-                    matrix.columns // Rows and columns are identical here because we know the output width is gonna be the same as the number of grouped operations
-                );
-
-
-                byte[] destinationChannels = new byte[instruction.IndividualChannelWidth];
+                byte[] destinationChannels = new byte[width];
                 for (byte i = 0; i < destinationChannels.Length; i++)
                 {
                     destinationChannels[i] = i;
                 }
 
-                byte[] sourceChannels = new byte[instruction.OutputMaximumWidth]; // You have to play that game
+                byte[] sourceChannels = new byte[width]; // You have to play that game
                 for (byte i = 0; i < sourceChannels.Length; i++)
                 {
-                    sourceChannels[i] = 
+                    sourceChannels[i] =
                         statements[i] == null ?
-                        (i == 0 ? i : sourceChannels[i-1]) : // Compiler does not care whether this is invalid or not, so it's fine. Repeating the previous swizzle gets us around
+                        (i == 0 ? i : sourceChannels[i - 1]) : // Compiler does not care whether this is invalid or not, so it's fine. Repeating the previous swizzle gets us around
                         statements[i].Arguments[0].UsedChannels[i];
                 }
+
+                MxMultiply instruction = new MxMultiply(
+                    @base.Instruction.modifiers.isHalfPrecision,
+                    width,
+                    matrix.columns, // Rows and columns are identical here because we know the output width is gonna be the same as the number of grouped operations
+                    (byte)destinationChannels.Length
+                );
 
                 CodeData destination = @base.Destination;
                 destination.SetChannels(destinationChannels);
@@ -784,10 +801,90 @@
         private void AdjustDataSize()
         {
             ShrinkDataToDestinations();
+            SimplifyUselessWrites();
 
             while (ShrinkVariablesToUsage())
             {
                 ShrinkDataToDestinations();
+                SimplifyUselessWrites();
+            }
+        }
+
+        private readonly struct UselessWrite
+        {
+            public readonly Statement statement;
+            public readonly byte destinationChannel;
+
+            public UselessWrite(Statement statement, byte destinationChannel)
+            {
+                this.statement = statement;
+                this.destinationChannel = destinationChannel;
+            }
+        }
+
+        private void SimplifyUselessWrites()
+        {
+            List<UselessWrite> uselessWrites = new List<UselessWrite>();
+
+            for (int i = 0; i < statements.Count; i++)
+            {
+                // Only modify instructions here, not variables
+                Statement statement = statements[i];
+                if (statement is Comment)
+                {
+                    continue;
+                }
+
+                if (statement.Destination is VariableData varData)
+                {
+                    Variable variable = varData.variable;
+                    byte[] writtenChannels = varData.UsedChannels;
+
+                    for (int channelIndex = 0; channelIndex < writtenChannels.Length; channelIndex++)
+                    {
+                        bool writeIsUseful = false;
+
+                        // Check if somebody wrote in it later, and nobody ever read it
+                        for (int statementIndex = i + 1; statementIndex < statements.Count; statementIndex++)
+                        {
+                            Statement otherStatement = statements[statementIndex];
+                            if (otherStatement is Comment)
+                            {
+                                continue;
+                            }
+
+                            // If somebody reads it, it was useful
+                            if (otherStatement.ReadsVariableChannel(variable, writtenChannels[channelIndex]))
+                            {
+                                writeIsUseful = true;
+                                break;
+                            }
+
+                            // Check if it's being written to otherwise
+                            if (otherStatement.WritesVariableChannel(variable, writtenChannels[channelIndex]))
+                            {
+                                // Write is useless and we know it - we got overwritten before being read
+                                break;
+                            }
+                        }
+
+                        if (!writeIsUseful)
+                        {
+                            uselessWrites.Add(new UselessWrite(statement, writtenChannels[channelIndex]));
+                        }
+                    }
+                }
+            }
+
+            if (uselessWrites.Count > 0)
+            {
+                for (int i = 0; i < uselessWrites.Count; i++)
+                {
+                    Statement statement = uselessWrites[i].statement;
+                    byte channelToKill = uselessWrites[i].destinationChannel;
+
+                    //statement.Destination.KillChannel(channelToKill);
+                }
             }
         }
 
@@ -922,9 +1019,9 @@
                     continue;
                 }
 
-                // This could be smarter (shrinking based on reading first AND then on destination)
-                CodeData[] candidates = new CodeData[statements[i].Arguments.Length + 1];
-                candidates[candidates.Length - 1] = statements[i].Destination;
+                // Shrinking only based on what is READ, not what is written (sometimes too much is written - e.g. tex2D)
+                CodeData[] candidates = new CodeData[statements[i].Arguments.Length];
+                Array.Copy(statements[i].Arguments, candidates, candidates.Length);
 
                 for (int dataIndex = 0; dataIndex < candidates.Length; dataIndex++)
                 {
@@ -1000,6 +1097,7 @@
                 }
             }
 
+
             RefreshVariableUsage(workStatements);
 
             statements.Clear();
@@ -1040,7 +1138,9 @@
                 {
                     for (int channelIndex = 0; channelIndex < variableData.UsedChannels.Length; channelIndex++)
                     {
-                        if (requiredWrittenVariableChannels.FindIndex(o => o.usedChannel == variableData.UsedChannels[channelIndex] && o.variable == variableData.variable) >= 0)
+                        if (requiredWrittenVariableChannels.FindIndex(
+                            o => o.usedChannel == variableData.UsedChannels[channelIndex] &&
+                            o.variable == variableData.variable) >= 0)
                         {
                             continue; // Do not add redundant dependencies
                         }
@@ -1049,7 +1149,6 @@
                     }
                 }
             }
-
 
             // Another hidden dependancy that statements have is the LAST WRITE of the variable they're about to overwrite
             // A statement that writes into a variable X cannot occur if X needs to be read at a prior time than it is about to be rewritten
@@ -1076,11 +1175,49 @@
                 int selfIndex = statements.IndexOf(statement);
                 Dictionary<VariableChannel, int> statementIndexAtWhichChannelIsReady = new Dictionary<VariableChannel, int>();
 
+                // Everything that read in that variable before me, is a dependency of mine
+                // This is because code is going to be reordered!
+                // We don't need to include writers because the code after this one does it
+                for (int i = 0; i < selfIndex; i++)
+                {
+                    if (statements[i] is Comment)
+                    {
+                        continue;
+                    }
+
+                    CodeData[] readers = statements[i].Arguments;
+                    for (int argumentIndex = 0; argumentIndex < readers.Length; argumentIndex++)
+                    {
+                        if (readers[argumentIndex] is VariableData accessedVariable)
+                        {
+                            for (int rqVariableIndex = 0; rqVariableIndex < willModifyChannel.Count; rqVariableIndex++)
+                            {
+                                VariableChannel varChan = willModifyChannel[rqVariableIndex];
+                                Variable lookingForVariable = varChan.variable;
+
+                                if (lookingForVariable == accessedVariable.variable)
+                                {
+                                    for (int otherStatementUsedChannelIndex = 0; otherStatementUsedChannelIndex < accessedVariable.UsedChannels.Length; otherStatementUsedChannelIndex++)
+                                    {
+                                        byte channelUsed = accessedVariable.UsedChannels[otherStatementUsedChannelIndex];
+
+                                        if (channelUsed == varChan.usedChannel)
+                                        {
+                                            family.Add(statements[i]); // It's okay if we add it multiple times
+                                            break; // Jump to next variable channel
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+
                 for (int i = selfIndex - 1; i >= 0; i--)
                 {
                     if (statements[i].Destination is VariableData otherStatementVariableData)
                     {
-
                         for (int rqVariableIndex = 0; rqVariableIndex < requiredWrittenVariableChannels.Count; rqVariableIndex++)
                         {
                             VariableChannel varChan = requiredWrittenVariableChannels[rqVariableIndex];
@@ -1112,39 +1249,46 @@
                     }
                 }
 
-                // Now we need to identify the read dependencies - AKA the statements that need to read our destination BEFORE we modify it
-                if (statement.Destination is VariableData destinationVarData)
-                {
-                    foreach (VariableChannel chan in statementIndexAtWhichChannelIsReady.Keys)
-                    {
-                        int readyLine = statementIndexAtWhichChannelIsReady[chan];
-                        for (int i = selfIndex - 1; i > readyLine; i--)
-                        {
-                            Statement dependency = statements[i];
-                            if (dependency is Comment)
-                            {
-                                continue;
-                            }
+                //// Now we need to identify the read dependencies - AKA the statements that need to read our destination BEFORE we modify it
+                //if (statement.Destination is VariableData destinationVarData)
+                //{
+                //    foreach (VariableChannel chan in statementIndexAtWhichChannelIsReady.Keys)
+                //    {
+                //        int readyLine = statementIndexAtWhichChannelIsReady[chan];
+                //        for (int i = selfIndex - 1; i > readyLine; i--)
+                //        {
+                //            Statement dependency = statements[i];
+                //            if (dependency is Comment)
+                //            {
+                //                continue;
+                //            }
 
-                            for (int argIndex = 0; argIndex < dependency.Arguments.Length; argIndex++)
-                            {
-                                if (dependency.Arguments[argIndex] is VariableData variableData &&
-                                    variableData.variable == destinationVarData.variable) // uh oh
-                                {
-                                    for (int channelIndex = 0; channelIndex < variableData.UsedChannels.Length; channelIndex++)
-                                    {
-                                        byte channel = variableData.UsedChannels[channelIndex];
-                                        if (destinationVarData.UsesChannel(channel)) // UH OH
-                                        {
-                                            family.Add(dependency); // They need to read it before we write it
-                                            break;
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
+                //            for (int argIndex = 0; argIndex < dependency.Arguments.Length; argIndex++)
+                //            {
+                //                if (dependency.Arguments[argIndex] is VariableData variableData) // uh oh
+                //                {
+
+                //                    for (int channelIndex = 0; channelIndex < variableData.UsedChannels.Length; channelIndex++)
+                //                    {
+                //                        byte channel = variableData.UsedChannels[channelIndex];
+
+                //                        int modifiedChannelIndex = willModifyChannel.FindIndex(o => variableData.variable == o.variable && o.usedChannel == channel);
+
+                //                        if (modifiedChannelIndex >= 0) // UH OH
+                //                        {
+                //                            bool modified = family.Add(dependency); // They need to read it before we write it
+
+                //                            if (modified)
+                //                            {
+                //                                Debug.Write("");
+                //                            }
+                //                        }
+                //                    }
+                //                }
+                //            }
+                //        }
+                //    }
+                //}
 
                 // This will break if the variables and origins/destinations have not been properly shrunk
                 System.Diagnostics.Debug.Assert(requiredWrittenVariableChannels.Count == 0);

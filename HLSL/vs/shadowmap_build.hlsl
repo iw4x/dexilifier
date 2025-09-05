@@ -22,11 +22,15 @@ VSOutput VSMain(VSInput vin)
 	
 float4 var_posn = float4(vin.position.x, vin.position.y, vin.position.z, 1);
 
-	vout.position.w = dot(var_posn, worldViewProjectionMatrix[3]);
-
-	var_posn.x = dot(var_posn, worldViewProjectionMatrix[2]);
-
+	vout.position = mul(var_posn, worldViewProjectionMatrix);
 	vout.texcoord = var_posn.x;
+	vout.position.z = var_posn.x;
+
+	return vout;
+}
+
+
+var_posn.x;
 	vout.position.z = var_posn.x;
 	vout.position.y = dot(var_posn, worldViewProjectionMatrix[1]);
 	vout.position.x = dot(var_posn, worldViewProjectionMatrix[0]);

@@ -11,7 +11,7 @@ half4 PSMain(VSOutput inputVx) : SV_Target
 
 	half4 outColor;
 
-	outColor = inputVx.texcoord;
+	outColor = inputVx.texcoord.xxxx;
 
 	return outColor;
 }

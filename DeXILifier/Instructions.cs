@@ -21,6 +21,8 @@
 
             public override int OutputMaximumWidth => 4;
 
+            public override int OutputMinimumWidth => 4;
+
             public SampleTexture(InstructionModifiers modifiers) : base(modifiers)
             {
             }
@@ -143,6 +145,7 @@
 
         public class Move : Instruction
         {
+            public override int InputCount => 1;
             public override int[] GetInputsMaximumWidth(IReadOnlyList<CodeData> inputs)
             {
                 return new int[] { 4 };
@@ -161,10 +164,19 @@
 
         public class DotProduct : Instruction
         {
+            public override int InputCount => knownWidth.Value == 2 ? 3 : 2;
+
             // DP4 actually means that "at least one" of the entries has that width, not both
             public override int[] GetInputsMaximumWidth(IReadOnlyList<CodeData> inputs)
             {
-                return new int[] { knownWidth.Value, knownWidth.Value, 1 };
+                if (InputCount == 3)
+                {
+                    return new int[] { knownWidth.Value, knownWidth.Value, 1 };
+                }
+                else
+                {
+                    return new int[] { knownWidth.Value, knownWidth.Value };
+                }
             }
 
             public override int OutputMaximumWidth => 1;
@@ -196,7 +208,7 @@
         {
             public override int[] GetInputsMaximumWidth(IReadOnlyList<CodeData> inputs)
             {
-                return new int[] { 4, 4, 4 };
+                return new int[] { 4, 4 };
             }
 
 
@@ -282,6 +294,8 @@
 
         public class DirectionDifference : Instruction
         {
+            public override int InputCount => 1;
+
             public override int[] GetInputsMaximumWidth(IReadOnlyList<CodeData> inputs)
             {
                 return new int[] { 4 };
@@ -343,6 +357,7 @@
 
         public class Abs : Instruction
         {
+            public override int InputCount => 1;
             public override int[] GetInputsMaximumWidth(IReadOnlyList<CodeData> inputs)
             {
                 return new int[] { 4 };
@@ -360,6 +375,7 @@
 
         public class Normalize : Instruction
         {
+            public override int InputCount => 1;
             public override int[] GetInputsMaximumWidth(IReadOnlyList<CodeData> inputs)
             {
                 return new int[] { 4 };
@@ -379,6 +395,7 @@
 
         public class Log : Instruction
         {
+            public override int InputCount => 1;
             public override int[] GetInputsMaximumWidth(IReadOnlyList<CodeData> inputs)
             {
                 return new int[] { 4 };
@@ -396,8 +413,31 @@
             }
         }
 
+        public class Clip : Instruction
+        {
+            public override int InputCount => 1;
+
+            public Clip() : base(default)
+            {
+            }
+
+            protected override string FormatCallInternal(params string[] arguments)
+            {
+                System.Diagnostics.Debug.Assert(arguments.Length == InputCount);
+
+                return string.Format("clip({0})", arguments);
+            }
+
+            public override int[] GetInputsMaximumWidth(IReadOnlyList<CodeData> inputs)
+            {
+                return new int[] { 4 };
+            }
+        }
+
         public class Compare : Instruction
         {
+            public override int InputCount => 3;
+
             public override int[] GetInputsMaximumWidth(IReadOnlyList<CodeData> inputs)
             {
                 return new int[] { 4, 4, 4 };
@@ -419,6 +459,7 @@
 
         public class Lerp : Instruction
         {
+            public override int InputCount => 3;
             public override int[] GetInputsMaximumWidth(IReadOnlyList<CodeData> inputs)
             {
                 return new int[] { 4, 4, 4 };
@@ -440,6 +481,7 @@
 
         public class Exponential : Instruction
         {
+            public override int InputCount => 1;
             public override int[] GetInputsMaximumWidth(IReadOnlyList<CodeData> inputs)
             {
                 return new int[] { 4 };
@@ -459,6 +501,7 @@
 
         public class Reciprocal : Instruction
         {
+            public override int InputCount => 1;
             public override bool DestinationMaskDictatesInputWidth => false;
 
             public override int[] GetInputsMaximumWidth(IReadOnlyList<CodeData> inputs)
@@ -480,6 +523,7 @@
 
         public class SquareRoot : Instruction
         {
+            public override int InputCount => 1;
             public override int[] GetInputsMaximumWidth(IReadOnlyList<CodeData> inputs)
             {
                 return new int[] { 1 };
@@ -501,6 +545,7 @@
 
         public class ReciprocalSquareRoot : Instruction
         {
+            public override int InputCount => 1;
             public override bool DestinationMaskDictatesInputWidth => false;
 
             public override int[] GetInputsMaximumWidth(IReadOnlyList<CodeData> inputs)
@@ -522,6 +567,7 @@
 
         public class Length : Instruction
         {
+            public override int InputCount => 1;
             public override int[] GetInputsMaximumWidth(IReadOnlyList<CodeData> inputs)
             {
                 return new int[] { 4 };
@@ -545,6 +591,7 @@
 
         public class SinCos : Instruction
         {
+            public override int InputCount => 1;
             public override int[] GetInputsMaximumWidth(IReadOnlyList<CodeData> inputs)
             {
                 return new int[] { 1 };
@@ -636,6 +683,7 @@
 
         public class Frac : Instruction
         {
+            public override int InputCount => 1;
             public override int[] GetInputsMaximumWidth(IReadOnlyList<CodeData> inputs)
             {
                 return new int[] { 4 };
@@ -698,6 +746,7 @@
 
         public class MultiplyAdd : Instruction
         {
+            public override int InputCount => 3;
             public override int[] GetInputsMaximumWidth(IReadOnlyList<CodeData> inputs)
             {
                 return new int[] { 4, 4, 4 };

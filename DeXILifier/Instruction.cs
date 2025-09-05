@@ -3,6 +3,8 @@
     using System;
     using System.Collections.Generic;
     using System.Data;
+    using System.Diagnostics;
+    using System.Xml.Linq;
     using static DX9ShaderHLSLifier.Instructions;
     using static DX9ShaderHLSLifier.ShaderProgramObject;
 
@@ -12,12 +14,11 @@
 
         public readonly InstructionModifiers modifiers;
 
-        public virtual int[] GetInputsMaximumWidth(IReadOnlyList<CodeData> inputs)
-        {
-            return new int[0];
-        }
+        public virtual int InputCount => 2;
 
         public virtual int OutputMaximumWidth => 4;
+
+        public virtual int OutputMinimumWidth => 1;
 
         public virtual bool OutputInputAreSameSize => true;
 
@@ -33,8 +34,13 @@
             this.modifiers = modifiers;
         }
 
+        public abstract int[] GetInputsMaximumWidth(IReadOnlyList<CodeData> inputs);
+
         public virtual bool Simplify(ShaderProgramObject.CodeData destination, ShaderProgramObject.CodeData[] arguments)
         {
+            Debug.Assert(arguments.Length == InputCount);
+            Debug.Assert(GetInputsMaximumWidth(arguments).Length == InputCount);
+
             bool modified = false;
 
             if (destination.UsedChannels.Length > OutputMaximumWidth)
@@ -46,6 +52,15 @@
             if (GetInputsMaximumWidth(arguments).Length < arguments.Length)
             {
                 throw new Exception($"Misconfiguration on {GetType()}");
+            }
+
+            // If destinations have "never been written" it means they've been shrank
+            if (destination is VariableData varData &&
+                !varData.variable.HaveChannelsBeenWritten(destination.UsedChannels))
+            {
+                byte biggestWrittenChannel = varData.GetDataWidth();
+                destination.Shrink(biggestWrittenChannel);
+                modified |= true;
             }
 
             for (int i = 0; i < arguments.Length; i++)
@@ -75,7 +90,6 @@
             {
                 if (arguments[i] is ShaderProgramObject.ResourceData data)
                 {
-                    if (data.modifiers.isNegated)
                     {
                         if (FlipSignIfMajorityIsNegative(data, out ResourceData newData))
                         {
@@ -266,6 +280,21 @@
             if (modifiers.isAbsolute)
             {
                 str = string.Format("abs({0})", str);
+            }
+
+            if (!OutputInputAreSameSize && 
+                (/*OutputMaximumWidth > destination.UsedChannels.Length || */OutputMinimumWidth > destination.UsedChannels.Length) &&
+                arguments.Count > 0)
+            {
+                // We need to add a swizzle to add implicit vector truncation
+                string swizzle = "({0}).";
+
+                for (int i = 0; i < destination.UsedChannels.Length; i++)
+                {
+                    swizzle += arguments[0].RepresentsColor ? destination.UsedChannels[i].ColorChannel() : destination.UsedChannels[i].VectorChannel();
+                }
+
+                str = string.Format(swizzle, str);
             }
 
             return str;

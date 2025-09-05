@@ -26,12 +26,12 @@ half3 var_G = normalize(inputVx.texcoord5);
 	
 half4 var_modellighting;
 var_modellighting.w = dot(fogSunDir.xyz, var_G);
-	var_modellighting.w = var_modellighting.w + fogSunConsts.y;
+	var_modellighting.w = var_modellighting.w + (-fogSunConsts.y);
 	var_modellighting.w = saturate(var_modellighting.w * fogSunConsts.z);
 	
 half3 var_H = fogColorLinear.xyz;
 	
-half3 var_I = -var_H + fogSunColorLinear.xyz;
+half3 var_I = (-var_H) + fogSunColorLinear.xyz;
 	
 half3 var_outr = var_modellighting.w * var_I + fogColorLinear.xyz;
 	
@@ -52,7 +52,7 @@ var_D.w = 1 / var_C;
 	var_modellighting = tex3D(modelLightingSampler, var_D.xyz);
 	var_modellighting.xyz = var_modellighting.xyz + var_modellighting.xyz;
 	var_modellighting.xyz = var_modellighting.xyz * var_modellighting.xyz;
-	var_modellighting.xyz = var_colormap.rgb * var_modellighting.xyz + -var_outr;
+	var_modellighting.xyz = var_colormap.rgb * var_modellighting.xyz + (-var_outr);
 
 	outColor.xyz = inputVx.texcoord1.w * var_modellighting.xyz + var_outr;
 	outColor.w = 1;

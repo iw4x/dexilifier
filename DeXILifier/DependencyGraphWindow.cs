@@ -211,7 +211,7 @@
                             {
                                 int line = block.originalLines[lineIndex];
                                 string txt = textLines[line];
-                                sb.AppendLine(txt);
+                                //sb.AppendLine(txt);
                                 sb.AppendLine(block.decompiledOutput);
                             }
 

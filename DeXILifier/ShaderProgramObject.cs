@@ -1,6 +1,7 @@
 ﻿namespace DX9ShaderHLSLifier
 {
     using Microsoft.Win32;
+    using SharpDX.Direct3D9;
     using System;
     using System.Collections.Generic;
     using System.Diagnostics;
@@ -598,6 +599,73 @@
                 }
             }
 
+            public bool ReadsVariable(Variable variable)
+            {
+                if (Arguments == null)
+                {
+                    return false;
+                }
+
+                for (int i = 0; i < Arguments.Length; i++)
+                {
+                    if (Arguments[i] is VariableData varData && varData.variable == variable)
+                    {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+
+            public bool ReadsVariableChannel(Variable variable, byte channel)
+            {
+                if (Arguments == null)
+                {
+                    return false;
+                }
+
+
+                for (int i = 0; i < Arguments.Length; i++)
+                {
+                    if (Arguments[i] is VariableData varData && varData.variable == variable && varData.UsesChannel(channel))
+                    {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+
+            public bool WritesVariable(Variable variable)
+            {
+                if (Destination == null)
+                {
+                    return false;
+                }
+
+                if (Destination is VariableData varData && varData.variable == variable)
+                {
+                    return true;
+                }
+
+                return false;
+            }
+
+            public bool WritesVariableChannel(Variable variable, byte channel)
+            {
+                if (Destination == null)
+                {
+                    return false;
+                }
+
+                if (Destination is VariableData varData && varData.variable == variable && varData.UsesChannel(channel))
+                {
+                    return true;
+                }
+
+                return false;
+            }
+
             public bool Simplify()
             {
                 if (Destination is CodeData)
@@ -699,18 +767,13 @@
                 this.usedChannels = newChannels;
             }
 
-            public void KillChannel(int channelIndex)
+            public void KillChannel(byte channel)
             {
-                if (channelIndex < UsedChannels.Length)
                 {
                     List<byte> newChannels = new List<byte>(UsedChannels);
-                    newChannels.RemoveAt(channelIndex);
+                    newChannels.RemoveAll(o=>o==channel);
 
                     SetChannels(newChannels.ToArray());
-                }
-                else
-                {
-                    // Nothing to remove or to shift
                 }
             }
 
@@ -896,27 +959,29 @@
                 }
                 else
                 {
-                    // Truncate channels because we can't read what we have never written!
-                    int lastWrittenChannel = 0;
-                    for (int i = 0; i < newChannels.Length; i++)
-                    {
-                        bool haveIt = variable.HasChannelBeenWritten(newChannels[i]);
+                    // I'm not sure the compiler does that - i think my code was simply wrong elsewhere
 
-                        if (haveIt)
-                        {
-                            lastWrittenChannel = i;
-                        }
-                    }
+                    //// Truncate channels because we can't read what we have never written!
+                    //int lastWrittenChannel = 0;
+                    //for (int i = 0; i < newChannels.Length; i++)
+                    //{
+                    //    bool haveIt = variable.HasChannelBeenWritten(newChannels[i]);
 
-                    if (newChannels.Length - 1 > lastWrittenChannel)
-                    {
-                        // This is something the compiler does - it lets undefined behaviour exist on members that aren't used
-                        // We need to account for it by shrinking the whole statement if one of the reads is invalid
-                        // It WILL happen in the middle of a variable so we need to read the entire thing to make sure
-                        byte[] truncatedChannels = new byte[lastWrittenChannel + 1];
-                        Array.Copy(newChannels, truncatedChannels, truncatedChannels.Length);
-                        SetChannels(truncatedChannels);
-                    }
+                    //    if (haveIt)
+                    //    {
+                    //        lastWrittenChannel = i;
+                    //    }
+                    //}
+
+                    //if (newChannels.Length - 1 > lastWrittenChannel)
+                    //{
+                    //    // This is something the compiler does - it lets undefined behaviour exist on members that aren't used
+                    //    // We need to account for it by shrinking the whole statement if one of the reads is invalid
+                    //    // It WILL happen in the middle of a variable so we need to read the entire thing to make sure
+                    //    byte[] truncatedChannels = new byte[lastWrittenChannel + 1];
+                    //    Array.Copy(newChannels, truncatedChannels, truncatedChannels.Length);
+                    //    SetChannels(truncatedChannels);
+                    //}
                 }
             }
 
@@ -931,9 +996,9 @@
 
                 System.Diagnostics.Debug.Assert(channels.Length > 0);
 
-                if (!variable.HaveChannelsBeenWritten(channels))
+                if (!variable.HaveChannelsBeenWritten(channels) && !forWrite)
                 {
-                    //throw new Exception($"Read more channels than the variable was written to?");
+                    throw new Exception($"Read more channels than the variable was written to?");
                 }
 
                 bool needsExplicit = 
@@ -1204,29 +1269,42 @@
 
                     bool shouldOverwrite = registers[registerIndex] == null;
 
-
                     if (!shouldOverwrite)
                     {
-                        if (parameters.alwaysCreateNewVariables)
+                        // If the channels we're about to write is all that's ever been written to the variable
+                        // then it's a new variable
+                        byte writtenChannels = registers[registerIndex].writtenChannels;
+                        byte remainingChannels = writtenChannels;
+                        for (int channelIndex = 0; channelIndex < channels.Length; channelIndex++)
+                        {
+                            byte channel = (byte)(1 << channels[channelIndex]);
+
+                            if ((remainingChannels & channel) != 0)
+                            {
+                                remainingChannels = (byte)(remainingChannels & ~channel);
+                            }
+                        }
+
+                        if (remainingChannels == 0)
                         {
                             shouldOverwrite = true;
                         }
-                        else
+                        else if (parameters.alwaysCreateNewVariables)
                         {
-                            // If the channels we're about to write is all that's ever been written to the variable
-                            // then it's a new variable
-                            byte writtenChannels = registers[registerIndex].writtenChannels;
+                            int rewrittenCount = 0;
                             for (int channelIndex = 0; channelIndex < channels.Length; channelIndex++)
                             {
                                 byte channel = (byte)(1 << channels[channelIndex]);
 
                                 if ((writtenChannels & channel) != 0)
                                 {
-                                    writtenChannels = (byte)(writtenChannels & ~channel);
+                                    rewrittenCount++;
                                 }
                             }
 
-                            if (writtenChannels == 0)
+                            bool everythingRewritten = rewrittenCount >= 4;
+
+                            if (everythingRewritten)
                             {
                                 shouldOverwrite = true;
                             }
@@ -1700,7 +1778,11 @@
             Type type = Type.float4;
             if (registerName.Contains("."))
             {
-                if (registerName.Contains('z'))
+                if (registerName.Contains('w'))
+                {
+                    type = Type.float4;
+                }
+                else if (registerName.Contains('z'))
                 {
                     type = Type.float3;
                 }
@@ -1832,38 +1914,8 @@
 
         private void ParseStatement(ShaderState state, int index, string instructionStr, string lineContents, InstructionModifiers modifiers)
         {
-            Instruction instruction = ParseInstruction(instructionStr, modifiers);
-
-            string[] elements = lineContents.Split(new string[] { ", " }, StringSplitOptions.None);
-            string writtenData = elements[0];
-            string[] readData = new string[elements.Length - 1];
-            Array.Copy(elements, 1, readData, 0, readData.Length);
-
-            if (elements.Length < 2)
-            {
-                throw new Exception($"Invalid instruction {lineContents}");
-            }
-
-            state.GetDestinationInfo(
-                index, 
-                writtenData, 
-                out string destinationName,
-                out byte[] destChannels, 
-                out bool destSwizzle, 
-                out CodeData.DataModifiers destModifiers
-            );
-
-            CodeData[] origins = new CodeData[readData.Length];
-            for (int i = 0; i < readData.Length; i++)
-            {
-                origins[i] = state.GetOrigin(destChannels, destSwizzle, index, readData[i]);
-            }
-
-            CodeData destination = state.CreateDestination(index, destinationName, destChannels, destSwizzle, destModifiers);
-
             Statement statement;
-
-            
+            Instruction instruction = ParseInstruction(instructionStr, modifiers);
 
             if (instruction == null)
             {
@@ -1871,6 +1923,30 @@
             }
             else
             {
+
+                string[] elements = lineContents.Split(new string[] { ", " }, StringSplitOptions.None);
+                string writtenData = elements[0];
+                string[] readData = new string[elements.Length - 1];
+                Array.Copy(elements, 1, readData, 0, readData.Length);
+
+                Debug.Assert(readData.Length == instruction.InputCount);
+                state.GetDestinationInfo(
+                    index,
+                    writtenData,
+                    out string destinationName,
+                    out byte[] destChannels,
+                    out bool destSwizzle,
+                    out CodeData.DataModifiers destModifiers
+                );
+
+                CodeData[] origins = new CodeData[readData.Length];
+                for (int i = 0; i < readData.Length; i++)
+                {
+                    origins[i] = state.GetOrigin(destChannels, destSwizzle, index, readData[i]);
+                }
+
+                CodeData destination = state.CreateDestination(index, destinationName, destChannels, destSwizzle, destModifiers);
+
                 statement = new Statement(index, instruction, destination, origins);
             }
 
@@ -2035,6 +2111,12 @@
                 case "cmp":
                     {
                         instruction = new Instructions.Compare(modifiers);
+                        break;
+                    }
+
+                case "texkill":
+                    {
+                        instruction = new Instructions.Clip();
                         break;
                     }
 
