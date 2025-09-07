@@ -1,4 +1,4 @@
-﻿namespace DX9ShaderHLSLifier
+﻿namespace DeXILifier
 {
     using SharpDX.Direct3D9;
     using System;

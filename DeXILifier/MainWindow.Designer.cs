@@ -1,4 +1,4 @@
-﻿namespace DX9ShaderHLSLifier
+﻿namespace DeXILifier
 {
     partial class MainWindow
     {
@@ -74,7 +74,7 @@
             this.shaderTab = new System.Windows.Forms.TabPage();
             this.splitContainer2 = new System.Windows.Forms.SplitContainer();
             this.techniqueSetTab = new System.Windows.Forms.TabPage();
-            this.techSetView = new DX9ShaderHLSLifier.TechniqueSetView();
+            this.techSetView = new DeXILifier.TechniqueSetView();
             groupBox3 = new System.Windows.Forms.GroupBox();
             rebuiltHlslGroup = new System.Windows.Forms.GroupBox();
             groupBox3.SuspendLayout();
@@ -368,8 +368,6 @@
             // 
             this.optimizeCheckBox.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
-            this.optimizeCheckBox.Checked = true;
-            this.optimizeCheckBox.CheckState = System.Windows.Forms.CheckState.Checked;
             this.optimizeCheckBox.Location = new System.Drawing.Point(6, 24);
             this.optimizeCheckBox.Name = "optimizeCheckBox";
             this.optimizeCheckBox.Size = new System.Drawing.Size(105, 23);
@@ -593,6 +591,7 @@
             // techSetView
             // 
             this.techSetView.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.techSetView.Enabled = false;
             this.techSetView.Location = new System.Drawing.Point(3, 3);
             this.techSetView.Name = "techSetView";
             this.techSetView.Size = new System.Drawing.Size(1034, 757);

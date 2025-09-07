@@ -1,10 +1,10 @@
-﻿namespace DX9ShaderHLSLifier
+﻿namespace DeXILifier
 {
     using System;
     using System.Collections.Generic;
     using System.Linq;
     using System.Reflection;
-    using static DX9ShaderHLSLifier.ShaderProgramObject;
+    using static DeXILifier.ShaderProgramObject;
 
     public static class Instructions
     {
@@ -58,6 +58,7 @@
                 for (int argumentIndex = 0; argumentIndex < arguments.Count; argumentIndex++)
                 {
                     CodeData argument = arguments[argumentIndex];
+
                     strArguments[argumentIndex] = argument.GetDecompiledName();
                 }
 

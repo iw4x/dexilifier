@@ -1,8 +1,8 @@
-﻿namespace DX9ShaderHLSLifier
+﻿namespace DeXILifier
 {
     using System;
     using System.Collections.Generic;
-    using static DX9ShaderHLSLifier.ShaderOptimizer;
+    using static DeXILifier.ShaderOptimizer;
     using static System.Windows.Forms.VisualStyles.VisualStyleElement.TreeView;
 
     public readonly struct DependencyGraph

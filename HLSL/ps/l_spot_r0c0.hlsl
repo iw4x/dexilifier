@@ -26,16 +26,9 @@ var_outr.rgb = lightPosition.xyz + (-inputVx.texcoord5);
 	var_outr.a = dot(var_outr.rgb, var_outr.rgb);
 	var_outr.a = rsqrt(var_outr.a);
 	var_outr.rgb = var_outr.rgb * var_outr.aaa;
+	var_outr.a = 1 / var_outr.a;
 	
 half var_B = dot(var_outr.rgb, lightSpotDir.xyz);
-	
-half4 var_colormap;
-var_colormap.rgb = normalize(inputVx.texcoord1.xyz);
-	var_outr.r = saturate(dot(var_outr.rgb, var_colormap.rgb));
-	var_outr.rgb *= lightDiffuse.xyz;
-	var_colormap = tex2D(colorMapSampler, inputVx.texcoord);
-	var_colormap.rgb *= inputVx.color;
-	var_colormap.rgb = var_colormap.rgb * var_colormap.rgb;
 	
 half var_C = saturate(var_B * lightSpotFactors.x + lightSpotFactors.y);
 	
@@ -43,17 +36,29 @@ half var_D = pow(abs(var_C), abs(lightSpotFactors.z));
 	
 half4 var_E;
 var_E.x = ((-var_C) >= 0 ? 0 : var_D);
-	var_outr.a = 1 / var_outr.a;
 	var_outr.a *= saturate(lightPosition.w);
 	
-half4 var_attenuation = tex2D(attenuationSampler, var_outr.aa);
-	var_E.yzw = var_attenuation.xyz * var_attenuation.xyz;
+half3 var_attenuation = (tex2D(attenuationSampler, var_outr.aa)).rgb;
+	var_E.yzw = var_attenuation * var_attenuation;
 	var_E.xyz = var_E.xxx * var_E.yzw;
-	var_E.xyz *= var_colormap.rgb;
+	
+half3 var_colormap = (tex2D(colorMapSampler, inputVx.texcoord)).xyz;
+	var_colormap *= inputVx.color;
+	var_colormap = var_colormap * var_colormap;
+	var_E.xyz *= var_colormap;
+	var_colormap = normalize(inputVx.texcoord1.xyz);
+	var_outr.r = saturate(dot(var_outr.rgb, var_colormap));
+	var_outr.rgb *= lightDiffuse.xyz;
 	var_outr.rgb = var_E.xyz * var_outr.rgb - fogColorLinear.xyz;
 
 	outColor.xyz = inputVx.texcoord1.w * var_outr.rgb + fogColorLinear.xyz;
 	outColor.w = 1;
+
+	return outColor;
+}
+
+
+or.w = 1;
 
 	return outColor;
 }

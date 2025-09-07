@@ -1,4 +1,4 @@
-﻿namespace DX9ShaderHLSLifier
+﻿namespace DeXILifier
 {
     using SharpDX.Direct3D9;
     using System;
@@ -6,7 +6,7 @@
     using System.Diagnostics;
     using System.Linq;
     using System.Reflection;
-    using static DX9ShaderHLSLifier.ShaderProgramObject;
+    using static DeXILifier.ShaderProgramObject;
 
 
     public readonly struct ShaderOptimizer

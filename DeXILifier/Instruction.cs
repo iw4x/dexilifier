@@ -1,12 +1,12 @@
-﻿namespace DX9ShaderHLSLifier
+﻿namespace DeXILifier
 {
     using System;
     using System.Collections.Generic;
     using System.Data;
     using System.Diagnostics;
     using System.Xml.Linq;
-    using static DX9ShaderHLSLifier.Instructions;
-    using static DX9ShaderHLSLifier.ShaderProgramObject;
+    using static DeXILifier.Instructions;
+    using static DeXILifier.ShaderProgramObject;
 
     public abstract class Instruction
     {
@@ -59,8 +59,13 @@
                 !varData.variable.HaveChannelsBeenWritten(destination.UsedChannels))
             {
                 byte biggestWrittenChannel = varData.GetDataWidth();
-                destination.Shrink(biggestWrittenChannel);
-                modified |= true;
+                
+                // this does not make sense?
+                if (biggestWrittenChannel < destination.UsedChannels.Length)
+                {
+                    destination.Shrink(biggestWrittenChannel);
+                    modified |= true;
+                }
             }
 
             for (int i = 0; i < arguments.Length; i++)

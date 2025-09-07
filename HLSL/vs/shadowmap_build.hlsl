@@ -23,8 +23,8 @@ VSOutput VSMain(VSInput vin)
 float4 var_posn = float4(vin.position.x, vin.position.y, vin.position.z, 1);
 
 	vout.position = mul(var_posn, worldViewProjectionMatrix);
-	vout.texcoord = var_posn.x;
 	vout.position.z = var_posn.x;
+	vout.texcoord = var_posn.x;
 
 	return vout;
 }

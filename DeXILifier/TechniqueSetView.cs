@@ -1,6 +1,6 @@
-﻿namespace DX9ShaderHLSLifier
+﻿namespace DeXILifier
 {
-    using DX9ShaderHLSLifier.Models;
+    using DeXILifier.Models;
     using System;
     using System.Collections.Generic;
     using System.ComponentModel;
@@ -158,7 +158,7 @@
                     if (shader.HasValue)
                     {
                         Directory.CreateDirectory(Path.Combine(exportPath, "ps"));
-                        using(FileStream fs = File.OpenWrite(Path.Combine(exportPath, "ps", px)))
+                        using(FileStream fs = File.Open(Path.Combine(exportPath, "ps", px), FileMode.Create))
                         {
                             shader.Value.Export(fs);
                         }
@@ -178,7 +178,7 @@
                     if (shader.HasValue)
                     {
                         Directory.CreateDirectory(Path.Combine(exportPath, "vs"));
-                        using (FileStream fs = File.OpenWrite(Path.Combine(exportPath, "vs", vx)))
+                        using (FileStream fs = File.Open(Path.Combine(exportPath, "vs", vx), FileMode.Create))
                         {
                             shader.Value.Export(fs);
                         }

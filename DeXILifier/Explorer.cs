@@ -1,6 +1,6 @@
-﻿namespace DX9ShaderHLSLifier
+﻿namespace DeXILifier
 {
-    using DX9ShaderHLSLifier.Models;
+    using DeXILifier.Models;
     using Newtonsoft.Json;
     using SharpDX.Direct3D9;
     using System;

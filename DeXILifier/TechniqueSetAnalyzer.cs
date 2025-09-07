@@ -1,12 +1,12 @@
-﻿namespace DX9ShaderHLSLifier
+﻿namespace DeXILifier
 {
-    using DX9ShaderHLSLifier.Models;
+    using DeXILifier.Models;
     using SharpDX;
     using System;
     using System.Collections.Generic;
     using System.Reflection;
     using System.Threading.Tasks;
-    using static DX9ShaderHLSLifier.TechniqueSetAnalyzer;
+    using static DeXILifier.TechniqueSetAnalyzer;
 
     public static class TechniqueSetAnalyzer
     {

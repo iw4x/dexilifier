@@ -22,13 +22,13 @@ VSOutput VSMain(VSInput vin)
 
 	VSOutput vout = (VSOutput)0;
 	
-float4 var_posn = float4(vin.position.x, vin.position.y, vin.position.z, 1);
+float4 var_texd = float4(vin.position.x, vin.position.y, vin.position.z, 1);
 	
-float4 var_B = mul(var_posn, worldMatrix);
-	var_posn = mul(var_B, viewProjectionMatrix);
+float4 var_B = mul(var_texd, worldMatrix);
+	var_texd = mul(var_B, viewProjectionMatrix);
 
-	vout.position = var_posn;
-	vout.texcoord = dot(var_posn, depthFromClip);
+	vout.texcoord = dot(var_texd, depthFromClip);
+	vout.position = var_texd;
 
 	return vout;
 }

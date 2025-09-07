@@ -49,7 +49,7 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <PropertyGroup>
-    <StartupObject>DX9ShaderHLSLifier.Program</StartupObject>
+    <StartupObject>DeXILifier.Program</StartupObject>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug_PocVS|AnyCPU'">
     <DebugSymbols>true</DebugSymbols>
@@ -125,9 +125,6 @@
     <Compile Include="MainWindow.Designer.cs">
       <DependentUpon>MainWindow.cs</DependentUpon>
     </Compile>
-    <Compile Include="Models\MaterialTechniqueType.cs" />
-    <Compile Include="Models\Technique.cs" />
-    <Compile Include="Models\TechniqueSet.cs" />
     <Compile Include="OptimizationParameters.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="ProgressBarDialog.cs">
@@ -202,6 +199,12 @@
       <ProductName>.NET Framework 3.5 SP1</ProductName>
       <Install>false</Install>
     </BootstrapperPackage>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Common\Common.csproj">
+      <Project>{fd65e423-8d99-4d89-9b92-5586d079d159}</Project>
+      <Name>Common</Name>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

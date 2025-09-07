@@ -5,6 +5,10 @@ VisualStudioVersion = 17.7.34031.279
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DeXILifier", "DeXILifier\DeXILifier.csproj", "{57B7DA00-53FF-4A85-A881-E6559316A63C}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TechsetGenerator", "TechsetGenerator\TechsetGenerator.csproj", "{5ACA3E83-397D-4293-9214-09277A2C514E}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Common", "Common\Common.csproj", "{FD65E423-8D99-4D89-9B92-5586D079D159}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug_3DSampler|Any CPU = Debug_3DSampler|Any CPU
@@ -24,6 +28,26 @@ Global
 		{57B7DA00-53FF-4A85-A881-E6559316A63C}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{57B7DA00-53FF-4A85-A881-E6559316A63C}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{57B7DA00-53FF-4A85-A881-E6559316A63C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5ACA3E83-397D-4293-9214-09277A2C514E}.Debug_3DSampler|Any CPU.ActiveCfg = Debug|Any CPU
+		{5ACA3E83-397D-4293-9214-09277A2C514E}.Debug_3DSampler|Any CPU.Build.0 = Debug|Any CPU
+		{5ACA3E83-397D-4293-9214-09277A2C514E}.Debug_PocPS|Any CPU.ActiveCfg = Debug|Any CPU
+		{5ACA3E83-397D-4293-9214-09277A2C514E}.Debug_PocPS|Any CPU.Build.0 = Debug|Any CPU
+		{5ACA3E83-397D-4293-9214-09277A2C514E}.Debug_PocVS|Any CPU.ActiveCfg = Debug|Any CPU
+		{5ACA3E83-397D-4293-9214-09277A2C514E}.Debug_PocVS|Any CPU.Build.0 = Debug|Any CPU
+		{5ACA3E83-397D-4293-9214-09277A2C514E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5ACA3E83-397D-4293-9214-09277A2C514E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5ACA3E83-397D-4293-9214-09277A2C514E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5ACA3E83-397D-4293-9214-09277A2C514E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{FD65E423-8D99-4D89-9B92-5586D079D159}.Debug_3DSampler|Any CPU.ActiveCfg = Debug|Any CPU
+		{FD65E423-8D99-4D89-9B92-5586D079D159}.Debug_3DSampler|Any CPU.Build.0 = Debug|Any CPU
+		{FD65E423-8D99-4D89-9B92-5586D079D159}.Debug_PocPS|Any CPU.ActiveCfg = Debug|Any CPU
+		{FD65E423-8D99-4D89-9B92-5586D079D159}.Debug_PocPS|Any CPU.Build.0 = Debug|Any CPU
+		{FD65E423-8D99-4D89-9B92-5586D079D159}.Debug_PocVS|Any CPU.ActiveCfg = Debug|Any CPU
+		{FD65E423-8D99-4D89-9B92-5586D079D159}.Debug_PocVS|Any CPU.Build.0 = Debug|Any CPU
+		{FD65E423-8D99-4D89-9B92-5586D079D159}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FD65E423-8D99-4D89-9B92-5586D079D159}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FD65E423-8D99-4D89-9B92-5586D079D159}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FD65E423-8D99-4D89-9B92-5586D079D159}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

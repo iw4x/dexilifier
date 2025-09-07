@@ -1,4 +1,4 @@
-﻿namespace DX9ShaderHLSLifier
+﻿namespace DeXILifier
 {
     partial class DependencyGraphWindow
     {

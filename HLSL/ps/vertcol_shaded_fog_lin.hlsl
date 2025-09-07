@@ -21,11 +21,13 @@ half4 var_outr = var_colormap * inputVx.color;
 	
 half3 var_C = var_outr.rgb * var_outr.rgb;
 	var_outr.rgb = var_outr.rgb * (-var_outr.rgb) + materialColor.xyz;
+
+	outColor.w = var_outr.a;
+
 	var_outr.rgb = materialColor.w * var_outr.rgb + var_C;
 	var_outr.rgb -= fogColorLinear.xyz;
 
 	outColor.xyz = inputVx.texcoord.z * var_outr.rgb + fogColorLinear.xyz;
-	outColor.w = var_outr.a;
 
 	return outColor;
 }

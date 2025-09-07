@@ -1,4 +1,4 @@
-﻿namespace DX9ShaderHLSLifier
+﻿namespace DeXILifier
 {
     using Microsoft.Win32;
     using SharpDX.Direct3D9;
@@ -207,7 +207,7 @@
 
             public override void Declare(in List<DecompiledBlock> lines)
             {
-                lines.Add(new DecompiledBlock($"extern float{rows}x{columns} {GetDecompiledName()};", indent: 0));
+                lines.Add(new DecompiledBlock($"extern float{rows}x{columns} {GetDecompiledName()} : register({this.preferredRegister});", indent: 0));
             }
         }
 
@@ -739,9 +739,12 @@
             public void Shrink(int maxWidth)
             {
                 byte[] newChannels = new byte[maxWidth];
-                Array.Copy(UsedChannels, newChannels, newChannels.Length);
+                if (UsedChannels.Length != newChannels.Length)
+                {
+                    Array.Copy(UsedChannels, newChannels, newChannels.Length);
 
-                SetChannels(newChannels);
+                    SetChannels(newChannels);
+                }
             }
 
             public bool UsesChannel(byte channel)
@@ -940,9 +943,16 @@
 
                 SetChannels(readChannels);
 
-                if (!forWrite && !variable.HaveChannelsBeenWritten(this.UsedChannels))
+                if (!forWrite && !swizzle && !variable.HaveChannelsBeenWritten(this.UsedChannels))
                 {
-                    throw new Exception($"Tried to reference data that was not written yet!");
+                    for (int i = 0; i < this.UsedChannels.Length; i++)
+                    {
+                        if (!variable.HasChannelBeenWritten(this.UsedChannels[i]))
+                        {
+                            KillChannel(this.UsedChannels[i]);
+                            i--;
+                        }
+                    }
                 }
             }
 
