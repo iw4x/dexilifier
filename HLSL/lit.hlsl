@@ -115,7 +115,7 @@ half3 GetSpecular(half2 texcoord, half3 viewDir, half3 normal, half specularInte
 #if SUN
     // this looks like a fresnel but I could be wrong
     half RdotL = dot(reflectionVector, lightPosition.xyz);
-    half fresnel = (exp2(specularMap.a * 9.377517703) + 7.0) * (RdotL - 0.999249996) * 1.442695023; // need to find cleaner variable
+    half fresnel = (exp(specularMap.a * 6.5) + 7.0) * (RdotL - 0.99925) * LOG2E;
     
     reflection.rgb += saturate(exp2(fresnel)) * lightSpecular.xyz * specularIntensity;
 #endif
@@ -124,7 +124,7 @@ half3 GetSpecular(half2 texcoord, half3 viewDir, half3 normal, half specularInte
 
     return specularColor;
 #else
-    return half3(0,0,0);
+    return half3(0, 0, 0);
 #endif
 }
 

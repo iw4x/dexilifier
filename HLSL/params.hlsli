@@ -22,7 +22,7 @@ extern float4 shadowmapSwitchPartition : register(c2);
 extern float4 shadowmapScale : register(c4);
 extern float4 lightPosition : register(c17);
 extern float4 lightDiffuse : register(c18);
-extern float4 lightSpecular : register(c19); // todo
+extern float4 lightSpecular : register(c19);
 extern float4 fogSunConsts : register(c32);
 extern float4 fogSunDir : register(c33);
 extern float4 fogSunColorLinear : register(c34);
@@ -41,3 +41,7 @@ extern float4 spotShadowmapPixelAdjust;
 extern float4 envMapParms;
 #endif
 extern float4 detailScale;
+
+// Math constant
+#define HALF_255 128/255 // 0.501960814
+#define LOG2E 1.442695023
