@@ -29,9 +29,7 @@ half4 SampleModelLighting(half3 normalizedNormal, half3 baseLightingCoords)
     half3 probe_pos = (normalizedNormal * lightingLookupScale.xyz);
     probe_pos = probe_pos / maxNormal + baseLightingCoords;
     
-    half4 ambient = tex3D(modelLightingSampler, probe_pos);
-    ambient.rgb = pow(2 * ambient.rgb, 2);
-    return ambient;
+    return tex3D(modelLightingSampler, probe_pos);
 }
 
 #if SHADOW
@@ -100,20 +98,28 @@ half3 GetSunLight(half3 normalizedNormal)
 }
 #endif
 
-half3 GetSpecular(half2 texcoord, half3 viewDir, half3 normalizedNormal)
+half3 GetSpecular(half2 texcoord, half3 viewDir, half3 normal, half specularIntensity)
 {
 #if SPECULAR
     half4 specularMap = tex2D(specularMapSampler, texcoord);
     half3 specularColor = pow(specularMap.rgb, 2);
-    float roughness = 6 - (specularMap.a * 8); // 0=6 1=-2
+    half invVdotN = 1.0 - abs(dot(viewDir, normal));
+    specularColor *= lerp(envMapParms.x, envMapParms.y, pow(invVdotN, envMapParms.z));
 
-    float invVdotN = 1.0 - abs(dot(viewDir, normalizedNormal));
+    half3 reflectionVector = reflect(viewDir, normal);
 
-    half3 reflectionVector = reflect(viewDir, normalizedNormal);
-    half4 reflection = texCUBElod(reflectionProbeSampler, half4(reflectionVector, roughness));
+    half roughnessLOD = 6 - (specularMap.a * 8);
+    half4 reflection = texCUBElod(reflectionProbeSampler, half4(reflectionVector, roughnessLOD));
     reflection.rgb = pow(reflection.rgb, 2);
+    
+#if SUN
+    // this looks like a fresnel but I could be wrong
+    half RdotL = dot(reflectionVector, lightPosition.xyz);
+    half fresnel = (exp2(specularMap.a * 9.377517703) + 7.0) * (RdotL - 0.999249996) * 1.442695023; // need to find cleaner variable
+    
+    reflection.rgb += saturate(exp2(fresnel)) * lightSpecular.xyz * specularIntensity;
+#endif
 
-    specularColor *= lerp(envMapParms.x, envMapParms.y, pow(abs(invVdotN), envMapParms.z));
     specularColor *= reflection.rgb;
 
     return specularColor;
@@ -133,15 +139,16 @@ half4 PSMain(VSOutput inputVx) : SV_Target
     half3 normalizedNormal = GetNormal(inputVx, diffuse.a);
     half3 normalizedViewDir = normalize(inputVx.viewDir);
 
-    half4 light = SampleModelLighting(normalizedNormal, inputVx.baseLightingCoords);
-    half3 specular = GetSpecular(inputVx.texcoord.xy, normalizedViewDir, normalizedNormal);
+    half4 modelLight = SampleModelLighting(normalizedNormal, inputVx.baseLightingCoords);
+    half3 specular = GetSpecular(inputVx.texcoord.xy, normalizedViewDir, normalizedNormal, modelLight.w);
 
+    half3 light = pow(2 * modelLight.rgb, 2);
 #if SUN
     half3 directionnalLight = GetSunLight(normalizedNormal);
 #if SHADOW
-    directionnalLight *= SampleShadowMap(inputVx.shadowPos.xy, inputVx.shadowPos.z, light.w);
+    directionnalLight *= SampleShadowMap(inputVx.shadowPos.xy, inputVx.shadowPos.z, modelLight.w);
 #endif
-    light.rgb += directionnalLight * light.a;
+    light += directionnalLight * modelLight.a;
 #endif
 
     diffuse.rgb = pow(diffuse.rgb, 2); // pseudo gamma correction
@@ -156,7 +163,7 @@ half4 PSMain(VSOutput inputVx) : SV_Target
 #endif
 
     half4 outColor;
-    outColor.rgb = lerp(fogColor, diffuse.rgb * light.rgb + specular, inputVx.wsNormal.w);
+    outColor.rgb = lerp(fogColor, diffuse.rgb * light + specular, inputVx.wsNormal.w);
 #if BLENDED
     outColor.a = diffuse.a;
     outColor = ((abs(diffuse.a) == 0.0) ? diffuse : outColor); // no clue why they need this but it's in the asm
