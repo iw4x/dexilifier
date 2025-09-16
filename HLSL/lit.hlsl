@@ -1,99 +1,25 @@
 //#define SHADOW 1                // _sm
-#define SUN 1                   // _sun
+//#define SUN 1                   // _sun
 //#define DFOG 1                // _fog=0 _dfog=1
 //#define BLENDED 1               // b0
-#define NORMAL_MAP 1            // n0
-#define VERTEX_COLOR 1          // _nc=0
+//#define NORMAL_MAP 1            // n0
+//#define SPECULAR 1            // s0
+//#define VERTEX_COLOR 1          // _nc=0
 
-// hard coded registers
-extern sampler2D colorMapSampler : register(s0);
-extern sampler2D reflectionProbeSampler: register(s1);
-extern sampler2D lightmapSamplerPrimary: register(s2);
-extern sampler2D lightmapSamplerSecondary: register(s3);
-// from now on the samplers are placed sequentially based on use
-extern sampler3D modelLightingSampler;
-#if SHADOW
-extern sampler2D shadowmapSamplerSun;
-#endif
-#if NORMAL_MAP
-extern sampler2D normalMapSampler;
-#endif
+#include "params.hlsli"
+#include "vertex_declaration.hlsli"
 
-extern float4 lightingLookupScale : register(c3);
-extern float4 fogColorLinear : register(c0);
-
-#if SUN
-extern float4 lightDiffuse : register(c18);
-extern float4 lightPosition : register(c17);
-#endif
-
-#if DFOG
-extern float4 fogSunColorLinear : register(c34);
-extern float4 fogSunDir : register(c33);
-extern float4 fogSunConsts : register(c32);
-#endif
-
-#if SHADOW
-extern float4 sunShadowmapPixelAdjust : register(c5);
-extern float4 shadowmapScale : register(c4);
-extern float4 shadowmapSwitchPartition : register(c2);
-#endif
-
-struct VSOutput
+half3 GetFogColor(half3 viewDir)
 {
-#if VERTEX_COLOR
-    float4 color : COLOR0;
-#endif
-    float2 texcoord : TEXCOORD0;
-    float4 wsNormal : TEXCOORD1; // w contain the depth used by the fog interpolation
-#if NORMAL_MAP
-    float4 texcoord2 : TEXCOORD2;
-    float4 texcoord3 : TEXCOORD3;
-#endif
-#if SHADOW
-    float3 shadowPos : TEXCOORD4;
-#endif
-
 #if DFOG
-    float3 fogNormal : TEXCOORD5;
-#endif
-    float3 baseLightingCoords : TEXCOORD6;
-};
-
-half4 SampleColorMap(VSOutput inputVx)
-{
-    half4 var_colormap = tex2D(colorMapSampler, inputVx.texcoord);
-
-#if VERTEX_COLOR
-    var_colormap *= inputVx.color;
-    half alpha = 1 - (var_colormap.a * inputVx.color.a);
-#endif
-    var_colormap.rgb = pow(var_colormap.rgb, 2); // pseudo gamma correction
-    
-#if BLENDED
-    var_colormap.rgb *= var_colormap.a;
-    var_colormap.a = 1 - alpha;
-#endif
-    
-    return var_colormap;
-}
-
-half3 GetFogColor(VSOutput inputVx)
-{
-    half3 fogColor;
-    
-#if DFOG
-    half3 fogNormal = normalize(inputVx.fogNormal);
-    half sunFogVal = dot(fogSunDir.xyz, fogNormal);
-    sunFogVal = sunFogVal + fogSunConsts.y;
+    half sunFogVal = dot(fogSunDir.xyz, viewDir);
+    sunFogVal = sunFogVal - fogSunConsts.y;
     sunFogVal = saturate(sunFogVal * fogSunConsts.z);
     
-    fogColor = lerp(fogColorLinear.xyz, fogSunColorLinear.xyz, sunFogVal);
+    return lerp(fogColorLinear.rgb, fogSunColorLinear.rgb, sunFogVal);
 #else
-    fogColor = fogColorLinear.xyz;
+    return fogColorLinear.rgb;
 #endif
-    
-    return fogColor;
 }
 
 half4 SampleModelLighting(half3 normalizedNormal, half3 baseLightingCoords)
@@ -112,10 +38,10 @@ half4 SampleModelLighting(half3 normalizedNormal, half3 baseLightingCoords)
 half SampleShadowMap(float2 shadowPos, float bias, float ambient)
 {
     float4 shadowSample;
-    shadowSample.x = tex2Dlod(shadowmapSamplerSun, float4(shadowPos + sunShadowmapPixelAdjust.xy, 0, 0));
-    shadowSample.y = tex2Dlod(shadowmapSamplerSun, float4(shadowPos - sunShadowmapPixelAdjust.xy, 0, 0));
-    shadowSample.z = tex2Dlod(shadowmapSamplerSun, float4(shadowPos + sunShadowmapPixelAdjust.zw, 0, 0));
-    shadowSample.w = tex2Dlod(shadowmapSamplerSun, float4(shadowPos - sunShadowmapPixelAdjust.zw, 0, 0));
+    shadowSample.x = tex2Dlod(shadowmapSamplerSun, float4(shadowPos + sunShadowmapPixelAdjust.xy, 0, 0)).r;
+    shadowSample.y = tex2Dlod(shadowmapSamplerSun, float4(shadowPos - sunShadowmapPixelAdjust.xy, 0, 0)).r;
+    shadowSample.z = tex2Dlod(shadowmapSamplerSun, float4(shadowPos + sunShadowmapPixelAdjust.zw, 0, 0)).r;
+    shadowSample.w = tex2Dlod(shadowmapSamplerSun, float4(shadowPos - sunShadowmapPixelAdjust.zw, 0, 0)).r;
 
     shadowSample = shadowSample - bias; // bias
     shadowSample = (shadowSample >= 0 ? 1 : 0); // cutout
@@ -123,10 +49,10 @@ half SampleShadowMap(float2 shadowPos, float bias, float ambient)
     
     float2 shadowPartitionCoord = shadowPos * shadowmapSwitchPartition.w + shadowmapSwitchPartition.xy;
     float4 shadowPartSample;
-    shadowPartSample.x = tex2Dlod(shadowmapSamplerSun, float4(shadowPartitionCoord + sunShadowmapPixelAdjust.xy, 0, 0));
-    shadowPartSample.y = tex2Dlod(shadowmapSamplerSun, float4(shadowPartitionCoord - sunShadowmapPixelAdjust.xy, 0, 0));
-    shadowPartSample.z = tex2Dlod(shadowmapSamplerSun, float4(shadowPartitionCoord + sunShadowmapPixelAdjust.zw, 0, 0));
-    shadowPartSample.w = tex2Dlod(shadowmapSamplerSun, float4(shadowPartitionCoord - sunShadowmapPixelAdjust.zw, 0, 0));
+    shadowPartSample.x = tex2Dlod(shadowmapSamplerSun, float4(shadowPartitionCoord + sunShadowmapPixelAdjust.xy, 0, 0)).r;
+    shadowPartSample.y = tex2Dlod(shadowmapSamplerSun, float4(shadowPartitionCoord - sunShadowmapPixelAdjust.xy, 0, 0)).r;
+    shadowPartSample.z = tex2Dlod(shadowmapSamplerSun, float4(shadowPartitionCoord + sunShadowmapPixelAdjust.zw, 0, 0)).r;
+    shadowPartSample.w = tex2Dlod(shadowmapSamplerSun, float4(shadowPartitionCoord - sunShadowmapPixelAdjust.zw, 0, 0)).r;
     
     shadowPartSample = shadowPartSample - bias; // bias
     shadowPartSample = (shadowPartSample >= 0 ? 1 : 0); // cutout
@@ -145,19 +71,22 @@ half SampleShadowMap(float2 shadowPos, float bias, float ambient)
 }
 #endif
 
-half3 GetNormal(VSOutput inputVx)
+half3 GetNormal(VSOutput inputVx, float alpha)
 {
 #if NORMAL_MAP
-    half4 normalMap = tex2D(normalMapSampler, inputVx.texcoord);
-    normalMap.xy = normalMap.wy * half2(4.07999992, 4.06451607) - half2(2.07999992, 2.06451607); // FIXME: find clean variable
-    
+    half2 normalIntensity = lerp(half2(-2.07999992, -2.06451607), half2(2, 2), tex2D(normalMapSampler, inputVx.texcoord).wy);
+#if BLENDED
+    normalIntensity *= alpha;
+#endif
+
     half3 normal = inputVx.wsNormal.xyz;
-    normal += normalMap.x * inputVx.texcoord3.xyz;
-    normal += normalMap.y * inputVx.texcoord2.xyz;
+
+    normal += normalIntensity.x * inputVx.texcoord3.xyz;
+    normal += normalIntensity.y * inputVx.texcoord2.xyz;
 
     return normalize(normal.xyz);
 #else
-    hreturn = normalize(inputVx.wsNormal.xyz);
+    return normalize(inputVx.wsNormal.xyz);
 #endif
 }
 
@@ -171,13 +100,41 @@ half3 GetSunLight(half3 normalizedNormal)
 }
 #endif
 
+half3 GetSpecular(half2 texcoord, half3 viewDir, half3 normalizedNormal)
+{
+#if SPECULAR
+    half4 specularMap = tex2D(specularMapSampler, texcoord);
+    half3 specularColor = pow(specularMap.rgb, 2);
+    float roughness = 6 - (specularMap.a * 8); // 0=6 1=-2
+
+    float invVdotN = 1.0 - abs(dot(viewDir, normalizedNormal));
+
+    half3 reflectionVector = reflect(viewDir, normalizedNormal);
+    half4 reflection = texCUBElod(reflectionProbeSampler, half4(reflectionVector, roughness));
+    reflection.rgb = pow(reflection.rgb, 2);
+
+    specularColor *= lerp(envMapParms.x, envMapParms.y, pow(abs(invVdotN), envMapParms.z));
+    specularColor *= reflection.rgb;
+
+    return specularColor;
+#else
+    return half3(0,0,0);
+#endif
+}
+
 half4 PSMain(VSOutput inputVx) : SV_Target
 {
-    half4 outColor;
+    half4 diffuse = tex2D(colorMapSampler, inputVx.texcoord);
+#if VERTEX_COLOR
+    diffuse *= inputVx.color;
+#endif
+    half inverseAlpha = 1 - diffuse.a;
 
-    half4 diffuse = SampleColorMap(inputVx);
-    half3 normalizedNormal = GetNormal(inputVx);
+    half3 normalizedNormal = GetNormal(inputVx, diffuse.a);
+    half3 normalizedViewDir = normalize(inputVx.viewDir);
+
     half4 light = SampleModelLighting(normalizedNormal, inputVx.baseLightingCoords);
+    half3 specular = GetSpecular(inputVx.texcoord.xy, normalizedViewDir, normalizedNormal);
 
 #if SUN
     half3 directionnalLight = GetSunLight(normalizedNormal);
@@ -187,12 +144,19 @@ half4 PSMain(VSOutput inputVx) : SV_Target
     light.rgb += directionnalLight * light.a;
 #endif
 
-    half3 fogColor = GetFogColor(inputVx);
+    diffuse.rgb = pow(diffuse.rgb, 2); // pseudo gamma correction
 #if BLENDED
+    diffuse.rgb *= diffuse.a; // premultiplication
+#endif
+
+    half3 fogColor = GetFogColor(normalizedViewDir);
+#if BLENDED
+    diffuse.a = 1 - inverseAlpha; // no idea they need that but it's in the asm (maybe it's used by a particular variant at some point)
     fogColor *= diffuse.a;
 #endif
 
-    outColor.rgb = lerp(fogColor, diffuse.rgb * light.rgb, inputVx.wsNormal.w);
+    half4 outColor;
+    outColor.rgb = lerp(fogColor, diffuse.rgb * light.rgb + specular, inputVx.wsNormal.w);
 #if BLENDED
     outColor.a = diffuse.a;
     outColor = ((abs(diffuse.a) == 0.0) ? diffuse : outColor); // no clue why they need this but it's in the asm
