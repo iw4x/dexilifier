@@ -6,6 +6,9 @@
 //#define SPECULAR 1            // s0
 //#define VERTEX_COLOR 1          // _nc=0
 
+#define FRAGMENT 1
+
+#include "constants.hlsli"
 #include "params.hlsli"
 #include "vertex_declaration.hlsli"
 

@@ -41,7 +41,3 @@ extern float4 spotShadowmapPixelAdjust;
 extern float4 envMapParms;
 #endif
 extern float4 detailScale;
-
-// Math constant
-#define HALF_255 128/255 // 0.501960814
-#define LOG2E 1.442695023
