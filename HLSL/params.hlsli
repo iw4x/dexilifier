@@ -23,6 +23,7 @@ extern float4 shadowmapScale : register(c4);
 extern float4 lightPosition : register(c17);
 extern float4 lightDiffuse : register(c18);
 extern float4 lightSpecular : register(c19);
+extern float4 gameTime : register(c22);
 extern float4 fogSunConsts : register(c32);
 extern float4 fogSunDir : register(c33);
 extern float4 fogSunColorLinear : register(c34);

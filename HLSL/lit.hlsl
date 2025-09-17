@@ -82,8 +82,8 @@ half3 GetNormal(VSOutput inputVx, float alpha)
 
     half3 normal = inputVx.wsNormal.xyz;
 
-    normal += normalIntensity.x * inputVx.texcoord3.xyz;
-    normal += normalIntensity.y * inputVx.texcoord2.xyz;
+    normal += normalIntensity.x * inputVx.tangent.xyz;
+    normal += normalIntensity.y * inputVx.binormal.xyz;
 
     return normalize(normal.xyz);
 #else

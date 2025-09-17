@@ -6,7 +6,7 @@ VSOutput VSMain(VSInput vin)
 	
     vout.texcoord.xy = GetTexCoord(vin.texcoord);
 
-    vout.position = TransformPosition(vin.position);
+    vout.position = LocalToClip(vin.position);
 
     vout.texcoord.z = GetFogOpacity(vin.position);
     
