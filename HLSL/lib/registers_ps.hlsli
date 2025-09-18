@@ -23,16 +23,17 @@ extern float4 shadowmapScale : register(c4);
 extern float4 lightPosition : register(c17);
 extern float4 lightDiffuse : register(c18);
 extern float4 lightSpecular : register(c19);
-extern float4 gameTime : register(c22);
 extern float4 fogSunConsts : register(c32);
 extern float4 fogSunDir : register(c33);
 extern float4 fogSunColorLinear : register(c34);
 // from now on the constant registers are placed sequentially based on use
+#if LIGHT_PROBE
 extern float4 lightingLookupScale;
+#endif
 #if SUN
 extern float4 sunShadowmapPixelAdjust;
 #endif
-#if SPOT
+#if SPOT || OMNI
 extern float4 lightSpotDir;
 extern float4 lightSpotFactors;
 extern float4 lightFalloffPlacement;

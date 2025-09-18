@@ -15,7 +15,7 @@ struct VSOutput
     float4 color : COLOR0;
 #endif
     
-    float2 texcoord : TEXCOORD0;
+    float4 texcoord : TEXCOORD0;
     
     float4 wsNormal : TEXCOORD1; // w contain the depth used by the fog interpolation
     
