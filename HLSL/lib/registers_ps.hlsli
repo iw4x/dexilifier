@@ -14,6 +14,12 @@ extern sampler2D normalMapSampler;
 #if SPECULAR
 extern sampler2D specularMapSampler;
 #endif
+#if SPOT || OMNI
+extern sampler2D attenuationSampler;
+#endif
+#if DETAIL || BUMP_MAP
+extern sampler2D detailMapSampler;
+#endif
 
 // hard coded constant registers
 extern float4 fogColorLinear : register(c0);
@@ -42,4 +48,6 @@ extern float4 spotShadowmapPixelAdjust;
 #if SPECULAR
 extern float4 envMapParms;
 #endif
+#if DETAIL || BUMP_MAP
 extern float4 detailScale;
+#endif

@@ -1,11 +1,23 @@
 #if PIXEL
 
 half2 SampleNormalMap(half4 texcoord, float alpha) {
+#if NORMAL_MAP
     half2 normalMap = RemapNormal(tex2D(normalMapSampler, texcoord).wy);
 #if BLENDED
     normalMap *= alpha;
 #endif
     return normalMap;
+#else
+    return half2(0,0);
+#endif
+}
+
+half2 SampleBumpMap(half4 texcoord) {
+#if BUMP_MAP
+    return RemapNormal(tex2D(detailMapSampler, texcoord.xy * detailScale.xy).wy);
+#else
+    return half2(0,0);
+#endif
 }
 
 #if LIGHT_PROBE
@@ -19,25 +31,31 @@ half4 SampleModelLighting(half3 normal, half3 baseLightingCoords)
 #endif
 
 #if LIGHT_MAP
-half3 SampleLightmap(half4 texcoord, half2 normalMap) {
+half3 SampleLightmap(half4 texcoord, half2 normalMap, half2 bumpMap) {
 	half4 lightMapSecondary1 = tex2D(lightmapSamplerSecondary, texcoord.zw * float2(1.0, 0.5));
 	half4 lightMapSecondary2 = tex2D(lightmapSamplerSecondary, (texcoord.zw * float2(1.0, 0.5)) + float2(0.0, 0.5));
 
-    half2 terrainNormal = RemapNormal(half2(lightMapSecondary1.a, lightMapSecondary2.a));
-	half invLengthTerrain = 1 / length(half3(terrainNormal, 1));
+    half2 lightmapNormal = RemapNormal(half2(lightMapSecondary1.a, lightMapSecondary2.a));
+	half lightmapIntensity = length(half3(lightmapNormal, 1));
 
+    lightMapSecondary2.rgb /= lightmapIntensity;
 #if NORMAL_MAP
-    half TdotN = dot(terrainNormal, normalMap);
-
-	half invLengthNormalMap = 1 / length(half3(normalMap, 1));
-	invLengthTerrain *= invLengthNormalMap;
+    half NdotL = dot(normalMap, lightmapNormal);
+	half normalMapIntensity = length(half3(normalMap, 1));
     
-    half3 lightMap = lightMapSecondary2.rgb * saturate((TdotN * invLengthTerrain) + invLengthTerrain);
-    lightMap += lightMapSecondary1.rgb * invLengthNormalMap;
-    return lightMap;
-#else
-    return lightMapSecondary1.rgb + lightMapSecondary2.rgb * invLengthTerrain;
+    lightMapSecondary1.rgb /= normalMapIntensity;
+    lightMapSecondary2.rgb /= normalMapIntensity / (NdotL + 1);
 #endif
+#if BUMP_MAP
+    half BdotL = dot(bumpMap, lightmapNormal);
+	half bumpmapIntensity = length(half3(bumpMap, 1));
+    
+    // not 100% accurate with the original shader, probably a saturate missing somewhere
+    // this discrepency can be seen in mp_underpass between some stone bricks in dim light
+    lightMapSecondary1.rgb /= bumpmapIntensity;
+    lightMapSecondary2.rgb /= bumpmapIntensity / (BdotL + 1);
+#endif
+    return lightMapSecondary1.rgb + lightMapSecondary2.rgb;
 }
 #endif
 
@@ -49,15 +67,15 @@ half3 GetSunLight(half3 normalizedNormal)
 }
 #endif
 
-half3 GetSpecular(half2 texcoord, half3 viewDir, half3 normal, half sunlightVisibility, half alpha)
+half3 GetSpecular(VSOutput inputVx, half3 viewDir, half3 normal, half sunlightVisibility)
 {
 #if SPECULAR
-    half4 specularMap = tex2D(specularMapSampler, texcoord);
+    half4 specularMap = tex2D(specularMapSampler, inputVx.texcoord.xy);
     half3 specularColor = pow(specularMap.rgb, 2);
     half invVdotN = 1.0 - abs(dot(viewDir, normal));
 
 #if LIGHT_MAP
-    float envIntensity = saturate(dot(specularColor.xyz, 10)) * alpha;
+    float envIntensity = saturate(dot(specularColor.xyz, 10)) * inputVx.color.a;
 #else
     float envIntensity = 1;
 #endif
@@ -67,7 +85,11 @@ half3 GetSpecular(half2 texcoord, half3 viewDir, half3 normal, half sunlightVisi
 
     half roughnessLOD = 6 - (specularMap.a * 8);
     half4 reflection = texCUBElod(reflectionProbeSampler, half4(reflectionVector, roughnessLOD));
+#if PX
+    reflection.rgb = pow(abs(reflection.rgb), envMapParms.w);
+#else
     reflection.rgb = pow(reflection.rgb, 2);
+#endif
     
 #if SUN
     // this looks like a fresnel but I could be wrong
@@ -77,7 +99,9 @@ half3 GetSpecular(half2 texcoord, half3 viewDir, half3 normal, half sunlightVisi
     reflection.rgb += saturate(exp(fresnel)) * lightSpecular.xyz * sunlightVisibility;
 #endif
 
-    specularColor *= alpha;
+#if VERTEX_COLOR
+    specularColor *= inputVx.color.a;
+#endif
     specularColor *= reflection.rgb;
 
     return specularColor;

@@ -5,8 +5,11 @@
 //#define SUN 1                   // _sun
 //#define DFOG 1                  // _fog=0 _dfog=1
 //#define BLENDED 1               // b0
+//#define DETAIL_MAP 1            // d0
+//#define BUMP_MAP 1              // q0
 //#define NORMAL_MAP 1            // n0
 //#define SPECULAR 1              // s0
+//#define PX 1                    // px (no idea what it means exactly yet, have an impact on specular)
 //#define VERTEX_COLOR 1          // _nc=0
 
 #include "lib/constants.hlsli"
@@ -16,16 +19,31 @@
 #include "lib/fog.hlsli"
 #include "lib/light.hlsli"
 
-half3 GetNormal(VSOutput inputVx, half2 normalMap)
+half4 GetDiffuse(VSOutput inputVx) 
 {
-#if NORMAL_MAP
-    half3 normal = inputVx.wsNormal.xyz;
-    normal += normalMap.x * inputVx.tangent.xyz;
-    normal += normalMap.y * inputVx.binormal.xyz;
-    return normalize(normal.xyz);
-#else
-    return normalize(inputVx.wsNormal.xyz);
+    half4 diffuse = tex2D(colorMapSampler, inputVx.texcoord);
+#if DETAIL
+    diffuse.rgb += tex2D(detailMapSampler, inputVx.texcoord.xy * detailScale.xy).rgb - 0.5;
 #endif
+#if VERTEX_COLOR
+    diffuse *= inputVx.color;
+#endif
+    return diffuse;
+}
+
+half3 GetNormal(VSOutput inputVx, half2 normalMap, half2 bumpMap)
+{
+    half3 outNormal = inputVx.wsNormal.xyz;
+#if NORMAL_MAP
+    outNormal += normalMap.x * inputVx.tangent.xyz;
+    outNormal += normalMap.y * inputVx.binormal.xyz;
+#endif
+
+#if BUMP_MAP
+    outNormal += bumpMap.x * inputVx.tangent.xyz;
+    outNormal += bumpMap.y * inputVx.binormal.xyz;
+#endif
+    return normalize(outNormal);
 }
 
 half3 GetViewDir(VSOutput inputVx)
@@ -39,17 +57,11 @@ half3 GetViewDir(VSOutput inputVx)
 
 half4 PSMain(VSOutput inputVx) : SV_Target
 {
-    half4 diffuse = tex2D(colorMapSampler, inputVx.texcoord);
-#if VERTEX_COLOR
-    diffuse *= inputVx.color;
-    half vtxAlpha = inputVx.color.a;
-#else
-    half vtxAlpha = 1.0;
-#endif
-    half inverseAlpha = 1 - diffuse.a;
+    half4 diffuse = GetDiffuse(inputVx);
 
     half2 normalmap = SampleNormalMap(inputVx.texcoord, diffuse.a);
-    half3 normalizedNormal = GetNormal(inputVx, normalmap);
+    half2 bumpmap = SampleBumpMap(inputVx.texcoord);
+    half3 normalizedNormal = GetNormal(inputVx, normalmap, bumpmap);
     half3 normalizedViewDir = GetViewDir(inputVx);
 
 #if LIGHT_PROBE
@@ -57,7 +69,7 @@ half4 PSMain(VSOutput inputVx) : SV_Target
     half3 light = pow(2 * modelLight.rgb, 2);
     half sunlightVisibility = modelLight.a;
 #else
-    half3 lightMap = SampleLightmap(inputVx.texcoord, normalmap);
+    half3 lightMap = SampleLightmap(inputVx.texcoord, normalmap, bumpmap);
     half3 light = pow(lightMap, 2);
     half sunlightVisibility = tex2D(lightmapSamplerPrimary, inputVx.texcoord.zw).r;
 #endif
@@ -69,7 +81,7 @@ half4 PSMain(VSOutput inputVx) : SV_Target
 #endif
     light += directionnalLight * sunlightVisibility;
 #endif
-    half3 specular = GetSpecular(inputVx.texcoord.xy, normalizedViewDir, normalizedNormal, sunlightVisibility, vtxAlpha);
+    half3 specular = GetSpecular(inputVx, normalizedViewDir, normalizedNormal, sunlightVisibility);
 
     diffuse.rgb = pow(diffuse.rgb, 2); // pseudo gamma correction
 #if BLENDED
@@ -78,7 +90,6 @@ half4 PSMain(VSOutput inputVx) : SV_Target
 
     half3 fogColor = GetFogColor(normalizedViewDir);
 #if BLENDED
-    diffuse.a = 1 - inverseAlpha; // no idea they need that but it's in the asm (maybe it's used by a particular variant at some point)
     fogColor *= diffuse.a;
 #endif
 
