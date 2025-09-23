@@ -17,7 +17,7 @@ extern sampler2D specularMapSampler;
 #if SPOT || OMNI
 extern sampler2D attenuationSampler;
 #endif
-#if DETAIL || BUMP_MAP
+#if DETAIL || DETAIL_NORMAL
 extern sampler2D detailMapSampler;
 #endif
 
@@ -48,6 +48,6 @@ extern float4 spotShadowmapPixelAdjust;
 #if SPECULAR
 extern float4 envMapParms;
 #endif
-#if DETAIL || BUMP_MAP
+#if DETAIL || DETAIL_NORMAL
 extern float4 detailScale;
 #endif

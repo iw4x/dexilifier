@@ -19,7 +19,7 @@ struct VSOutput
     
     float4 wsNormal : TEXCOORD1; // w contain the depth used by the fog interpolation
     
-#if NORMAL_MAP || BUMP_MAP
+#if NORMAL_MAP || DETAIL_NORMAL
     float3 binormal : TEXCOORD2;
     float3 tangent : TEXCOORD3;
 #endif

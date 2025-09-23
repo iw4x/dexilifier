@@ -1,4 +1,5 @@
 #if VERTEX
+
 float4 LocalToWorld(float4 v) {
     return mul(v, worldMatrix);
 }
@@ -29,12 +30,6 @@ float2 GetTexCoord(float4 inputTexCoord)
     var_texd.zw = var_texd.zw * fractionalOfA.xy + var_texd.zw;
 
     return var_texd.zw * exp2(var_texd.xy);
-}
-
-#elif PIXEL
-
-float2 RemapNormal(float2 normal) {
-    return lerp(half2(-2.07999992, -2.06451607), half2(2, 2), normal);
 }
 
 #endif
