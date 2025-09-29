@@ -24,7 +24,7 @@ struct VSOutput
     float3 tangent : TEXCOORD3;
 #endif
     
-#if SHADOW
+#if SHADOW || HSHADOW
     float3 shadowPos : TEXCOORD4;
 #endif
 

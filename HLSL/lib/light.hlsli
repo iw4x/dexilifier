@@ -47,12 +47,12 @@ half3 GetSpecular(VSOutput inputVx, half3 viewDir, half3 normal, half sunlightVi
     specularColor *= inputVx.color.a;
 #endif
 
+    half fresnel = 1.0 - abs(dot(viewDir, normal));
     float envIntensity = 1;
 #if LIGHT_MAP
     envIntensity = saturate(dot(specularColor.xyz, 10)) * inputVx.color.a;
 #endif
-    half invVdotN = 1.0 - abs(dot(viewDir, normal));
-    specularColor *= lerp(envMapParms.x * envIntensity, envMapParms.y * envIntensity, pow(abs(invVdotN), envMapParms.z));
+    specularColor *= lerp(envMapParms.x * envIntensity, envMapParms.y * envIntensity, pow(abs(fresnel), envMapParms.z));
 
     half3 reflectionVector = reflect(viewDir, normal);
 
@@ -63,13 +63,13 @@ half3 GetSpecular(VSOutput inputVx, half3 viewDir, half3 normal, half sunlightVi
 #else
     reflection.rgb = pow(reflection.rgb, 2);
 #endif
-    
+
 #if SUN
-    // this looks like a fresnel but I could be wrong
+    // phong equation reordered (typicaly the reflection vector is the lightDir reflected by the normal and is then used in R dot V)
     half RdotL = dot(reflectionVector, lightPosition.xyz);
-    half fresnel = (exp(specularMap.a * 6.5) + 7.0) * (RdotL - 0.99925);
+    half reflectionIntensity = (exp(specularMap.a * 6.5) + 7.0) * (RdotL - 0.99925);
     
-    reflection.rgb += saturate(exp(fresnel)) * lightSpecular.xyz * sunlightVisibility;
+    reflection.rgb += saturate(exp(reflectionIntensity)) * lightSpecular.xyz * sunlightVisibility;
 #endif
 
     specularColor *= reflection.rgb;
@@ -80,44 +80,53 @@ half3 GetSpecular(VSOutput inputVx, half3 viewDir, half3 normal, half sunlightVi
 #endif
 }
 
-#if SHADOW
-half SampleShadowMap(float2 shadowPos, float bias, float sunlightVisibility)
+#if SHADOW || HSHADOW
+half SampleShadowMap(float2 shadowPos, float bias, float currentShadow)
 {
 #if SUN
     float4 adjust = sunShadowmapPixelAdjust;
 #else
     float4 adjust = spotShadowmapPixelAdjust;
 #endif
+#if HSHADOW
+    half zSample = bias;
+#else
+    half zSample = 0;
+#endif
 
-    float4 shadowSample;
-    shadowSample.x = tex2Dlod(shadowmapSamplerSun, float4(shadowPos + adjust.xy, 0, 0)).r;
-    shadowSample.y = tex2Dlod(shadowmapSamplerSun, float4(shadowPos - adjust.xy, 0, 0)).r;
-    shadowSample.z = tex2Dlod(shadowmapSamplerSun, float4(shadowPos + adjust.zw, 0, 0)).r;
-    shadowSample.w = tex2Dlod(shadowmapSamplerSun, float4(shadowPos - adjust.zw, 0, 0)).r;
+    float4 shadowSampleNear;
+    shadowSampleNear.x = tex2Dlod(shadowmapSamplerSun, float4(shadowPos + adjust.xy, zSample, 0)).r;
+    shadowSampleNear.y = tex2Dlod(shadowmapSamplerSun, float4(shadowPos - adjust.xy, zSample, 0)).r;
+    shadowSampleNear.z = tex2Dlod(shadowmapSamplerSun, float4(shadowPos + adjust.zw, zSample, 0)).r;
+    shadowSampleNear.w = tex2Dlod(shadowmapSamplerSun, float4(shadowPos - adjust.zw, zSample, 0)).r;
 
-    shadowSample = shadowSample - bias; // bias
-    shadowSample = (shadowSample >= 0 ? 1 : 0); // cutout
-    half shadowContribution = dot(shadowSample, 0.25); // average
+#if !HSHADOW
+    shadowSampleNear = shadowSampleNear - bias; // bias
+    shadowSampleNear = (shadowSampleNear >= 0 ? 1 : 0); // cutout
+#endif
+    half shadowNearAverage = dot(shadowSampleNear, 0.25); // average
     
-    float2 shadowPartitionCoord = shadowPos * shadowmapSwitchPartition.w + shadowmapSwitchPartition.xy;
-    float4 shadowPartSample;
-    shadowPartSample.x = tex2Dlod(shadowmapSamplerSun, float4(shadowPartitionCoord + adjust.xy, 0, 0)).r;
-    shadowPartSample.y = tex2Dlod(shadowmapSamplerSun, float4(shadowPartitionCoord - adjust.xy, 0, 0)).r;
-    shadowPartSample.z = tex2Dlod(shadowmapSamplerSun, float4(shadowPartitionCoord + adjust.zw, 0, 0)).r;
-    shadowPartSample.w = tex2Dlod(shadowmapSamplerSun, float4(shadowPartitionCoord - adjust.zw, 0, 0)).r;
+    float2 shadowFarCoord = shadowPos * shadowmapSwitchPartition.w + shadowmapSwitchPartition.xy;
+    float4 shadowSampleFar;
+    shadowSampleFar.x = tex2Dlod(shadowmapSamplerSun, float4(shadowFarCoord + adjust.xy, zSample, 0)).r;
+    shadowSampleFar.y = tex2Dlod(shadowmapSamplerSun, float4(shadowFarCoord - adjust.xy, zSample, 0)).r;
+    shadowSampleFar.z = tex2Dlod(shadowmapSamplerSun, float4(shadowFarCoord + adjust.zw, zSample, 0)).r;
+    shadowSampleFar.w = tex2Dlod(shadowmapSamplerSun, float4(shadowFarCoord - adjust.zw, zSample, 0)).r;
     
-    shadowPartSample = shadowPartSample - bias; // bias
-    shadowPartSample = (shadowPartSample >= 0 ? 1 : 0); // cutout
-    half shadowPartContribution = dot(shadowPartSample, 0.25); // average
+#if !HSHADOW
+    shadowSampleFar = shadowSampleFar - bias; // bias
+    shadowSampleFar = (shadowSampleFar >= 0 ? 1 : 0); // cutout
+#endif
+    half shadowFarAverage = dot(shadowSampleFar, 0.25); // average
 
-    half4 shadowScale = half4(shadowPos, shadowPartitionCoord) * shadowmapScale.xyxy + shadowmapScale.zzzw;
+    half4 shadowScale = half4(shadowPos, shadowFarCoord) * shadowmapScale.xyxy + shadowmapScale.zzzw;
+    half2 maxShadow = max(abs(shadowScale.xz), abs(shadowScale.yw));
+    maxShadow = saturate(8 - maxShadow);
+    half shadow = lerp(currentShadow, shadowFarAverage, maxShadow.y);
     // FIXME: understand this part better and find name for variable
-    half2 var_N = max(abs(shadowScale.xz), abs(shadowScale.yw));
-    var_N = saturate(8 - var_N);
-    half var_H = var_N.x * -var_N.y + var_N.x;
-    var_H = (-abs(var_H) >= 0 ? var_N.x : 1);
-    half shadowPartAmbient = lerp(shadowPartContribution, sunlightVisibility, var_N.y);
-    half shadow = lerp(shadowContribution, shadowPartAmbient, var_H);
+    half var_H = lerp(maxShadow.x, 0, maxShadow.y);
+    var_H = (-abs(var_H) >= 0 ? maxShadow.x : 1);
+    shadow = lerp(shadow, shadowNearAverage, var_H);
     
     return shadow;
 }

@@ -57,11 +57,19 @@ half4 PSMain(VSOutput inputVx) : SV_Target
     half sunlightVisibility = tex2D(lightmapSamplerPrimary, inputVx.texcoord.zw).r;
 #endif
 
+#if SHADOW || HSHADOW
+#if LIGHT_MAP
+    if(sunlightVisibility != 0)
+#endif
+    sunlightVisibility = SampleShadowMap(inputVx.shadowPos.xy, inputVx.shadowPos.z, sunlightVisibility);
+#if LIGHT_MAP
+    else
+        sunlightVisibility = 0;
+#endif
+#endif
+
 #if SUN
     half3 directionnalLight = GetSunLight(normalizedNormal);
-#if SHADOW
-    directionnalLight *= SampleShadowMap(inputVx.shadowPos.xy, inputVx.shadowPos.z, sunlightVisibility);
-#endif
     light += directionnalLight * sunlightVisibility;
 #endif
     half3 specular = GetSpecular(inputVx, normalizedViewDir, normalizedNormal, sunlightVisibility);

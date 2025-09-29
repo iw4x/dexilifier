@@ -5,7 +5,7 @@ extern sampler2D lightmapSamplerPrimary: register(s2);
 extern sampler2D lightmapSamplerSecondary: register(s3);
 // from now on the samplers are placed sequentially based on use
 extern sampler3D modelLightingSampler;
-#if SHADOW
+#if SHADOW || HSHADOW
 extern sampler2D shadowmapSamplerSun;
 #endif
 #if NORMAL_MAP

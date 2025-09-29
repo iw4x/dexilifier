@@ -19,7 +19,7 @@ half4 SampleDiffuse(VSOutput inputVx)  {
 }
 
 half2 SampleNormalMap(half4 texcoord, float alpha) {
-    half2 normalMap;
+    half2 normalMap = half2(0, 0);
 
 #if NORMAL_MAP
     normalMap = RemapNormal(tex2D(normalMapSampler, texcoord).wy);
